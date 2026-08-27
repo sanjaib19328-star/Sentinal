@@ -114,4 +114,9 @@ export const applicationsApi = {
     const response = await apiClient.post<import('../types/application').ConnectAndDiscoverResponse>('/api/v1/applications/connect-and-discover', data);
     return response.data;
   },
+
+  bulkApiCheck: async (id: number, data: import('../types/application').BulkApiCheckRequest): Promise<import('../types/application').BulkApiCheckResponse> => {
+    const response = await apiClient.post<import('../types/application').BulkApiCheckResponse>(`/api/v1/applications/${id}/bulk-api-check`, data);
+    return response.data;
+  },
 };

@@ -3,6 +3,7 @@ import { ApiEndpoint } from '../../types/application';
 import { ApiDetailsModal } from './ApiDetailsModal';
 import { ConnectApplicationModal } from './ConnectApplicationModal';
 import { ApiTestConsoleModal } from './ApiTestConsoleModal';
+import { BulkApiCheckModal } from './BulkApiCheckModal';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import {
   Compass,
@@ -39,6 +40,7 @@ export const ApiCatalogTab: React.FC<ApiCatalogTabProps> = ({
   const [consoleEndpoint, setConsoleEndpoint] = useState<ApiEndpoint | null>(null);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [isBulkCheckOpen, setIsBulkCheckOpen] = useState(false);
 
   const getMethodBadgeClass = (method: string) => {
     switch (method.toUpperCase()) {
@@ -146,6 +148,16 @@ export const ApiCatalogTab: React.FC<ApiCatalogTabProps> = ({
           >
             <Play style={{ width: '0.875rem', height: '0.875rem' }} />
             API Console
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsBulkCheckOpen(true)}
+            className="btn btn-secondary btn-sm flex items-center gap-1.5"
+            style={{ height: '34px', padding: '0 0.875rem' }}
+          >
+            <Zap style={{ width: '0.875rem', height: '0.875rem' }} />
+            AI Bulk Check
           </button>
 
           {/* Search */}
@@ -402,6 +414,17 @@ export const ApiCatalogTab: React.FC<ApiCatalogTabProps> = ({
         onClose={() => {
           setIsConsoleOpen(false);
           setConsoleEndpoint(null);
+        }}
+      />
+
+      {/* AI Bulk API Check Modal */}
+      <BulkApiCheckModal
+        isOpen={isBulkCheckOpen}
+        applicationId={applicationId}
+        totalEndpointsCount={endpoints.length}
+        onClose={() => {
+          setIsBulkCheckOpen(false);
+          onRefresh();
         }}
       />
     </div>

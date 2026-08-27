@@ -149,4 +149,15 @@ public class ConversationController {
         AiTestRunReportDto report = aiTestEngineService.executeAiTestRun(principal.getId(), request);
         return ResponseEntity.ok(report);
     }
+
+    @PostMapping("/applications/{applicationId}/bulk-api-check")
+    public ResponseEntity<com.sentinel.api.dto.BulkApiCheckResponse> bulkApiCheck(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable Long applicationId,
+        @RequestBody com.sentinel.api.dto.BulkApiCheckRequest request
+    ) {
+        request.setApplicationId(applicationId);
+        com.sentinel.api.dto.BulkApiCheckResponse response = aiTestEngineService.executeBulkApiCheck(principal.getId(), request);
+        return ResponseEntity.ok(response);
+    }
 }

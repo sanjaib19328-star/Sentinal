@@ -156,3 +156,38 @@ export interface ConnectAndDiscoverResponse {
   discoveredApis: ApiEndpoint[];
   message: string;
 }
+
+export interface BulkApiCheckRequest {
+  applicationId: number;
+  endpointIds?: number[];
+  batchIndex: number;
+  batchSize: number;
+}
+
+export interface BulkApiEndpointResult {
+  endpointId: number;
+  method: string;
+  path: string;
+  status: 'VALID' | 'WARNING' | 'ERROR' | 'REQUIRES_INPUT';
+  statusCode?: number;
+  latencyMs?: number;
+  responseValidity?: string;
+  detectedProblems?: string;
+  recommendation?: string;
+  parametersCount: number;
+  hasRequestBody: boolean;
+}
+
+export interface BulkApiCheckResponse {
+  applicationId: number;
+  batchIndex: number;
+  batchSize: number;
+  totalBatches: number;
+  totalEndpoints: number;
+  completedCount: number;
+  validCount: number;
+  warningCount: number;
+  errorCount: number;
+  lastBatch: boolean;
+  results: BulkApiEndpointResult[];
+}

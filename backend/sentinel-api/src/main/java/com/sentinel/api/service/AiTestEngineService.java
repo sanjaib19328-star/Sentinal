@@ -8,6 +8,9 @@ import com.sentinel.api.dto.AiTestStepDto;
 import com.sentinel.api.dto.AiTestStepResultDto;
 import com.sentinel.api.dto.ApiTestConsoleRequest;
 import com.sentinel.api.dto.ApiTestConsoleResultDto;
+import com.sentinel.api.dto.BulkApiCheckRequest;
+import com.sentinel.api.dto.BulkApiCheckResponse;
+import com.sentinel.api.dto.BulkApiEndpointResultDto;
 import com.sentinel.api.dto.RunAiTestRequest;
 import com.sentinel.api.exception.BadRequestException;
 import com.sentinel.api.exception.ResourceNotFoundException;
@@ -434,5 +437,136 @@ public class AiTestEngineService {
         list.add(new ApiEndpoint(app.getId(), "GET", "/api/health"));
         list.add(new ApiEndpoint(app.getId(), "GET", "/actuator/health"));
         return list;
+    }
+
+    public BulkApiCheckResponse executeBulkApiCheck(Long ownerId, BulkApiCheckRequest request) {
+        Application app = applicationRepository.findByIdAndOwnerId(request.getApplicationId(), ownerId)
+            .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
+
+        List<ApiEndpoint> allEndpoints = apiEndpointRepository.findByApplicationId(app.getId());
+        if (allEndpoints.isEmpty()) {
+            allEndpoints = generateFallbackEndpoints(app);
+        }
+
+        if (request.getEndpointIds() != null && !request.getEndpointIds().isEmpty()) {
+            java.util.Set<Long> filterIds = new java.util.HashSet<>(request.getEndpointIds());
+            allEndpoints = allEndpoints.stream()
+                .filter(ep -> filterIds.contains(ep.getId()))
+                .collect(java.util.stream.Collectors.toList());
+        }
+
+        int totalEndpoints = allEndpoints.size();
+        int batchSize = Math.max(1, Math.min(request.getBatchSize(), 50));
+        int totalBatches = totalEndpoints > 0 ? (int) Math.ceil((double) totalEndpoints / batchSize) : 1;
+        int batchIndex = Math.max(0, Math.min(request.getBatchIndex(), Math.max(0, totalBatches - 1)));
+
+        int fromIndex = batchIndex * batchSize;
+        int toIndex = Math.min(fromIndex + batchSize, totalEndpoints);
+
+        List<ApiEndpoint> batchEndpoints = fromIndex < totalEndpoints
+            ? allEndpoints.subList(fromIndex, toIndex)
+            : Collections.emptyList();
+
+        ApiKey apiKey = null;
+        try {
+            apiKey = resolveApiKey(app.getId(), null);
+        } catch (Exception e) {
+            log.warn("No active API key for bulk check of app {}", app.getId());
+        }
+
+        List<BulkApiEndpointResultDto> results = new ArrayList<>();
+        int validCount = 0;
+        int warningCount = 0;
+        int errorCount = 0;
+
+        for (ApiEndpoint ep : batchEndpoints) {
+            BulkApiEndpointResultDto res = new BulkApiEndpointResultDto();
+            res.setEndpointId(ep.getId());
+            res.setMethod(ep.getMethod());
+            res.setPath(ep.getNormalizedPath());
+            res.setHasRequestBody(ep.getMethod().equalsIgnoreCase("POST") || ep.getMethod().equalsIgnoreCase("PUT") || ep.getMethod().equalsIgnoreCase("PATCH"));
+
+            // Analyze path variables
+            boolean hasPathVars = ep.getNormalizedPath().contains("{") && ep.getNormalizedPath().contains("}");
+            int pathVarCount = 0;
+            if (hasPathVars) {
+                Matcher matcher = PATH_VAR_PATTERN.matcher(ep.getNormalizedPath());
+                while (matcher.find()) pathVarCount++;
+            }
+            res.setParametersCount(pathVarCount);
+
+            if (hasPathVars) {
+                res.setStatus("REQUIRES_INPUT");
+                res.setResponseValidity("Specification Valid");
+                res.setDetectedProblems("Requires dynamic path parameter(s) for live execution");
+                res.setRecommendation("Provide path parameter values or execute via workflow with preceding creator step");
+                warningCount++;
+            } else if (apiKey != null && ep.getMethod().equalsIgnoreCase("GET")) {
+                // Non-destructive safe probe via API test console
+                try {
+                    ApiTestConsoleRequest testReq = new ApiTestConsoleRequest();
+                    testReq.setApiKeyId(apiKey.getId());
+                    testReq.setMethod("GET");
+                    testReq.setPath(ep.getNormalizedPath());
+                    ApiTestConsoleResultDto probeRes = apiTestConsoleService.executeTest(ownerId, app.getId(), testReq);
+
+                    res.setStatusCode(probeRes.getStatusCode());
+                    res.setLatencyMs(probeRes.getLatencyMs());
+                    if (probeRes.getStatusCode() >= 200 && probeRes.getStatusCode() < 400) {
+                        res.setStatus("VALID");
+                        res.setResponseValidity("HTTP " + probeRes.getStatusCode() + " (" + probeRes.getLatencyMs() + "ms)");
+                        res.setRecommendation("Endpoint verified reachable and responding normally");
+                        validCount++;
+                    } else if (probeRes.getStatusCode() == 401 || probeRes.getStatusCode() == 403) {
+                        res.setStatus("WARNING");
+                        res.setResponseValidity("Authentication Required");
+                        res.setDetectedProblems("Upstream backend rejected request with HTTP " + probeRes.getStatusCode());
+                        res.setRecommendation("Configure Upstream Authentication headers or token in Sentinel");
+                        warningCount++;
+                    } else if (probeRes.getStatusCode() == 404) {
+                        res.setStatus("WARNING");
+                        res.setResponseValidity("Route Not Found (404)");
+                        res.setDetectedProblems("Backend returned 404 for this route");
+                        res.setRecommendation("Verify route path in application backend");
+                        warningCount++;
+                    } else {
+                        res.setStatus("ERROR");
+                        res.setResponseValidity("HTTP " + probeRes.getStatusCode() + " Server Error");
+                        res.setDetectedProblems("Upstream returned error status " + probeRes.getStatusCode());
+                        res.setRecommendation("Inspect application backend error logs");
+                        errorCount++;
+                    }
+                } catch (Exception ex) {
+                    res.setStatus("ERROR");
+                    res.setResponseValidity("Connection Error");
+                    res.setDetectedProblems(ex.getMessage());
+                    res.setRecommendation("Check backend connectivity and health");
+                    errorCount++;
+                }
+            } else {
+                // Non-GET endpoint without parameters or POST/PUT
+                res.setStatus("VALID");
+                res.setResponseValidity("Documented Specification Ready");
+                res.setRecommendation(res.isHasRequestBody() ? "Ready for payload testing" : "Ready for execution");
+                validCount++;
+            }
+
+            results.add(res);
+        }
+
+        BulkApiCheckResponse response = new BulkApiCheckResponse();
+        response.setApplicationId(app.getId());
+        response.setBatchIndex(batchIndex);
+        response.setBatchSize(batchSize);
+        response.setTotalBatches(totalBatches);
+        response.setTotalEndpoints(totalEndpoints);
+        response.setCompletedCount(toIndex);
+        response.setValidCount(validCount);
+        response.setWarningCount(warningCount);
+        response.setErrorCount(errorCount);
+        response.setLastBatch(batchIndex >= totalBatches - 1);
+        response.setResults(results);
+
+        return response;
     }
 }
