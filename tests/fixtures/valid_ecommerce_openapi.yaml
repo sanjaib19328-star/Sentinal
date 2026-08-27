@@ -1,0 +1,29 @@
+openapi: 3.0.0
+info:
+  title: E-Commerce Store API
+  version: 2.0.0
+  description: YAML formatted OpenAPI specification for Sentinel parser testing
+paths:
+  /products:
+    get:
+      summary: Retrieve products catalog
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Add new product SKU
+      responses:
+        '201':
+          description: Created
+  /products/{id}:
+    get:
+      summary: Get single product by numeric identifier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
