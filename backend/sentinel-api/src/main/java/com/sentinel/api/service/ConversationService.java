@@ -33,7 +33,10 @@ import java.util.stream.Collectors;
 public class ConversationService {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationService.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = com.fasterxml.jackson.databind.json.JsonMapper.builder()
+        .findAndAddModules()
+        .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .build();
 
     private final ConversationRepository conversationRepository;
     private final ConversationMessageRepository messageRepository;

@@ -42,7 +42,10 @@ import java.util.regex.Pattern;
 public class AiTestEngineService {
 
     private static final Logger log = LoggerFactory.getLogger(AiTestEngineService.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = com.fasterxml.jackson.databind.json.JsonMapper.builder()
+        .findAndAddModules()
+        .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .build();
     private static final Pattern PATH_VAR_PATTERN = Pattern.compile("\\{([a-zA-Z0-9_-]+)\\}");
 
     // Standard 1x1 transparent PNG fallback if test image is needed and user didn't attach one

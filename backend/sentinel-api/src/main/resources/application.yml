@@ -47,7 +47,7 @@ spring:
 sentinel:
   gemini:
     api-key: ${GEMINI_API_KEY:}
-    model: ${GEMINI_MODEL:gemini-3.7-flash}
+    model: ${GEMINI_MODEL:gemini-3.6-flash}
   jwt:
     secret: ${JWT_SECRET:sentinel-super-secret-jwt-key-minimum-256-bits-for-security-assurance-key}
     expiration: ${JWT_EXPIRATION:86400000} # 24 hours

@@ -1,6 +1,7 @@
 package com.sentinel.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sentinel.api.dto.ApiEndpointDto;
 import com.sentinel.api.dto.ApplicationMetricsResponse;
 import com.sentinel.api.dto.ApplicationResponse;
@@ -27,7 +28,10 @@ import java.util.Map;
 public class ToolExecutionService {
 
     private static final Logger log = LoggerFactory.getLogger(ToolExecutionService.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = com.fasterxml.jackson.databind.json.JsonMapper.builder()
+        .findAndAddModules()
+        .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .build();
 
     private final ApplicationService applicationService;
     private final ApplicationRepository applicationRepository;
@@ -60,13 +64,17 @@ public class ToolExecutionService {
 
                 case "get_application_health": {
                     Long appId = extractAppId(arguments, currentAppId);
-                    if (appId == null) return "{\"error\":\"applicationId is required\"}";
+                    if (appId == null) {
+                        return MAPPER.createObjectNode().put("error", "applicationId is required").toString();
+                    }
                     return MAPPER.writeValueAsString(getApplicationHealth(userId, appId));
                 }
 
                 case "get_application_metrics": {
                     Long appId = extractAppId(arguments, currentAppId);
-                    if (appId == null) return "{\"error\":\"applicationId is required\"}";
+                    if (appId == null) {
+                        return MAPPER.createObjectNode().put("error", "applicationId is required").toString();
+                    }
                     String timeRange = arguments.containsKey("timeRange") ? String.valueOf(arguments.get("timeRange")) : "24h";
                     return MAPPER.writeValueAsString(getApplicationMetrics(userId, appId, timeRange));
                 }
@@ -80,19 +88,26 @@ public class ToolExecutionService {
 
                 case "get_api_catalog": {
                     Long appId = extractAppId(arguments, currentAppId);
-                    if (appId == null) return "{\"error\":\"applicationId is required\"}";
+                    if (appId == null) {
+                        return MAPPER.writeValueAsString(getAllApiCatalogs(userId));
+                    }
                     return MAPPER.writeValueAsString(getApiCatalog(userId, appId));
                 }
 
                 case "get_system_overview":
                     return MAPPER.writeValueAsString(getSystemOverview(userId));
 
-                default:
-                    return "{\"error\":\"Unknown tool: " + toolName + "\"}";
+                default: {
+                    ObjectNode unknown = MAPPER.createObjectNode();
+                    unknown.put("error", "Unknown tool: " + toolName);
+                    return unknown.toString();
+                }
             }
         } catch (Exception e) {
             log.error("Tool execution failed for {}: {}", toolName, e.getMessage(), e);
-            return "{\"error\":\"Failed to execute tool: " + e.getMessage() + "\"}";
+            ObjectNode err = MAPPER.createObjectNode();
+            err.put("error", "Failed to execute tool: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+            return err.toString();
         }
     }
 
@@ -215,6 +230,30 @@ public class ToolExecutionService {
         result.put("applicationId", applicationId);
         result.put("totalEndpoints", endpoints.size());
         result.put("endpoints", endpoints);
+        return result;
+    }
+
+    public Map<String, Object> getAllApiCatalogs(Long userId) {
+        List<Application> apps = applicationRepository.findByOwnerId(userId);
+        List<Map<String, Object>> appCatalogs = new ArrayList<>();
+        int totalEndpoints = 0;
+        for (Application app : apps) {
+            List<ApiEndpointDto> endpoints = apiCatalogService.listApplicationEndpoints(userId, app.getId());
+            totalEndpoints += endpoints.size();
+            Map<String, Object> appItem = new HashMap<>();
+            appItem.put("applicationId", app.getId());
+            appItem.put("applicationName", app.getName());
+            appItem.put("baseUrl", app.getBaseUrl());
+            appItem.put("endpointCount", endpoints.size());
+            appItem.put("endpoints", endpoints);
+            appCatalogs.add(appItem);
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("source", "sentinel_database");
+        result.put("queriedAt", Instant.now().toString());
+        result.put("totalApplications", apps.size());
+        result.put("totalEndpoints", totalEndpoints);
+        result.put("applications", appCatalogs);
         return result;
     }
 

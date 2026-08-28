@@ -8,7 +8,6 @@ public final class PathNormalizer {
     private static final Pattern UUID_PATTERN = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     private static final Pattern HEX_ID_PATTERN = Pattern.compile("^[0-9a-fA-F]{16,64}$");
     private static final Pattern PREFIXED_ID_PATTERN = Pattern.compile("^[a-zA-Z]{2,6}_[a-zA-Z0-9]{6,}$");
-    private static final Pattern HYPHENATED_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9]+-[a-zA-Z0-9-]+$");
 
     private PathNormalizer() {
     }
@@ -70,9 +69,6 @@ public final class PathNormalizer {
             return true;
         }
         if (PREFIXED_ID_PATTERN.matcher(base).matches()) {
-            return true;
-        }
-        if (HYPHENATED_ID_PATTERN.matcher(base).matches()) {
             return true;
         }
         return false;
