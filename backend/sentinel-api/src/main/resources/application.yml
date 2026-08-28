@@ -31,11 +31,13 @@ spring:
       hibernate:
         format_sql: false
 
-  data:
+    data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
       timeout: ${REDIS_TIMEOUT:2000ms}
 
   flyway:
