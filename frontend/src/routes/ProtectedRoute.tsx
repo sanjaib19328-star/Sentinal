@@ -17,8 +17,9 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
 
   if (!isAuthenticated) {
     const isSourcePath = location.pathname.startsWith('/src') || location.pathname.includes('.');
-    const safeLocation = isSourcePath ? { ...location, pathname: '/dashboard' } : location;
-    return <Navigate to="/login" state={{ from: safeLocation }} replace />;
+    const rawPath = `${location.pathname}${location.search}${location.hash}`;
+    const targetPath = (isSourcePath || location.pathname === '/') ? '/dashboard' : rawPath;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(targetPath)}`} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

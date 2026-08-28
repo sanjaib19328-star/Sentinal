@@ -418,6 +418,14 @@ public class ApplicationService {
         if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
             trimmed = "http://" + trimmed;
         }
+        int queryIdx = trimmed.indexOf('?');
+        if (queryIdx != -1) {
+            trimmed = trimmed.substring(0, queryIdx);
+        }
+        int hashIdx = trimmed.indexOf('#');
+        if (hashIdx != -1) {
+            trimmed = trimmed.substring(0, hashIdx);
+        }
         return trimmed.replaceAll("/+$", "");
     }
 }

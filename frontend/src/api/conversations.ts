@@ -60,4 +60,18 @@ export const conversationsApi = {
     const res = await apiClient.post<AiTestRunReport>(`/api/v1/applications/${applicationId}/run-ai-test`, data);
     return res.data;
   },
+
+  getAiTestSession: async (applicationId: number): Promise<any> => {
+    const res = await apiClient.get<any>(`/api/v1/applications/${applicationId}/ai-test-session`);
+    return res.data;
+  },
+
+  provideSessionInput: async (applicationId: number, data: { inputKey?: string; inputValue?: string; fileBase64?: string; fileName?: string; fileContentType?: string }): Promise<any> => {
+    const res = await apiClient.post<any>(`/api/v1/applications/${applicationId}/ai-test-session/input`, data);
+    return res.data;
+  },
+
+  cancelAiTestSession: async (applicationId: number): Promise<void> => {
+    await apiClient.delete(`/api/v1/applications/${applicationId}/ai-test-session`);
+  },
 };

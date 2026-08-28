@@ -19,12 +19,13 @@ import {
 import { conversationsApi } from '../api/conversations';
 import { applicationsApi } from '../api/applications';
 import { apiKeysApi } from '../api/apiKeys';
-import { Conversation, ConversationDetail, AiTestRunReport } from '../types/conversation';
+import { Conversation, ConversationDetail, AiTestRunReport, AiTestSession } from '../types/conversation';
 import { Application } from '../types/application';
 import { ApiKey } from '../types/apiKey';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { MarkdownViewer } from '../components/common/MarkdownViewer';
+import { AiTestInputModal } from '../components/common/AiTestInputModal';
 
 export const AiAssistant: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -32,7 +33,7 @@ export const AiAssistant: React.FC = () => {
   const [activeConversation, setActiveConversation] = useState<ConversationDetail | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedAppId, setSelectedAppId] = useState<number | null>(null);
-  const [, setApiKeys] = useState<ApiKey[]>([]);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [selectedKeyId, setSelectedKeyId] = useState<number | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +42,10 @@ export const AiAssistant: React.FC = () => {
   const [loadingChat, setLoadingChat] = useState(false);
   const [sending, setSending] = useState(false);
   const [runningTest, setRunningTest] = useState(false);
+
+  // Waitable AI Test Session State
+  const [currentSession, setCurrentSession] = useState<AiTestSession | null>(null);
+  const [sessionModalOpen, setSessionModalOpen] = useState(false);
 
   // Rename state
   const [editingChatId, setEditingChatId] = useState<number | null>(null);
@@ -197,24 +202,70 @@ export const AiAssistant: React.FC = () => {
   const handleRunAiTestSuite = async () => {
     if (!activeConversationId || !selectedAppId || runningTest) return;
 
+    try {
+      const session = await conversationsApi.getAiTestSession(selectedAppId);
+      if (session && session.missingInputs && session.missingInputs.length > 0 && !attachedFile) {
+        setCurrentSession(session);
+        setSessionModalOpen(true);
+        return;
+      }
+    } catch (e) {
+      console.debug('Could not pre-fetch session', e);
+    }
+
+    await executeFullTestSuite(true);
+  };
+
+  const executeFullTestSuite = async (approveDestructive: boolean) => {
+    if (!activeConversationId || !selectedAppId) return;
     setRunningTest(true);
     try {
       await conversationsApi.runAiTestForConversation(activeConversationId, {
         applicationId: selectedAppId,
         apiKeyId: selectedKeyId || undefined,
-        fileBase64: attachedFile?.base64,
-        fileName: attachedFile?.name,
-        fileContentType: attachedFile?.type,
+        approveDestructiveOperations: approveDestructive,
+        fileBase64: attachedFile?.base64 || currentSession?.fileBase64,
+        fileName: attachedFile?.name || currentSession?.fileName,
+        fileContentType: attachedFile?.type || currentSession?.fileContentType,
       });
 
       await loadActiveConversation(activeConversationId);
       setAttachedFile(null);
+      setSessionModalOpen(false);
       loadConversations();
     } catch (e) {
       console.error('Failed to run AI test suite', e);
     } finally {
       setRunningTest(false);
     }
+  };
+
+  const handleProvideSessionInput = async (data: {
+    inputKey?: string;
+    inputValue?: string;
+    fileBase64?: string;
+    fileName?: string;
+    fileContentType?: string;
+  }) => {
+    if (!selectedAppId) return;
+    try {
+      const updated = await conversationsApi.provideSessionInput(selectedAppId, data);
+      setCurrentSession(updated);
+    } catch (e) {
+      console.error('Failed to provide session input', e);
+    }
+  };
+
+  const handleCancelSessionTest = async () => {
+    if (selectedAppId) {
+      try {
+        await conversationsApi.cancelAiTestSession(selectedAppId);
+      } catch (e) {
+        console.error('Failed to cancel session', e);
+      }
+    }
+    setCurrentSession(null);
+    setSessionModalOpen(false);
   };
 
   const handleRename = async (id: number) => {
@@ -287,7 +338,7 @@ export const AiAssistant: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Sparkles style={{ width: '1.125rem', height: '1.125rem', color: 'var(--primary)' }} />
-              <span style={{ fontWeight: 700, fontSize: '0.875rem' }}>Structured Test Execution Report</span>
+              <span style={{ fontWeight: 700, fontSize: '0.875rem' }}>Autonomous AI Test Execution & DAG Report</span>
             </div>
             <span
               className={`pill-badge ${
@@ -305,38 +356,61 @@ export const AiAssistant: React.FC = () => {
           <table className="ai-step-table">
             <thead>
               <tr>
+                <th style={{ width: '35px' }}>#</th>
                 <th>Method</th>
-                <th>Endpoint</th>
+                <th>Endpoint / Resolved Path</th>
                 <th>Status</th>
                 <th>Latency</th>
-                <th>Result</th>
+                <th>Execution Result</th>
               </tr>
             </thead>
             <tbody>
               {report.stepResults.map((step, idx) => (
                 <tr key={idx}>
+                  <td style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{idx + 1}</td>
                   <td>
-                    <span className={`pill-badge ${step.method === 'GET' ? 'pill-badge-green' : step.method === 'POST' ? 'pill-badge-blue' : 'pill-badge-amber'}`}>
+                    <span className={`method-pill ${
+                      step.method === 'GET' ? 'method-pill-get' :
+                      step.method === 'POST' ? 'method-pill-post' :
+                      step.method === 'PUT' || step.method === 'PATCH' ? 'method-pill-put' :
+                      step.method === 'DELETE' ? 'method-pill-delete' : 'method-pill-other'
+                    }`}>
                       {step.method}
                     </span>
                   </td>
-                  <td style={{ fontFamily: 'var(--font-mono)' }}>{step.resolvedPath || step.endpoint}</td>
+                  <td>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                      {step.resolvedPath || step.endpoint}
+                    </div>
+                    {step.blockedReason && (
+                      <div style={{ fontSize: '0.75rem', color: '#b45309', marginTop: '0.15rem' }}>
+                        ↳ {step.blockedReason}
+                      </div>
+                    )}
+                    {step.error && !step.blocked && (
+                      <div style={{ fontSize: '0.75rem', color: '#b91c1c', marginTop: '0.15rem' }}>
+                        ↳ {step.error}
+                      </div>
+                    )}
+                  </td>
                   <td>{step.status > 0 ? step.status : '-'}</td>
                   <td>{step.latencyMs}ms</td>
                   <td>
                     {step.passed ? (
-                      <span style={{ color: '#047857', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <CheckCircle2 style={{ width: '1rem', height: '1rem' }} /> OK
+                      <span style={{ color: '#047857', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8125rem' }}>
+                        <CheckCircle2 style={{ width: '1rem', height: '1rem' }} /> PASSED
                       </span>
-                    ) : step.requiresApproval ? (
-                      <span style={{ color: '#b45309', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <AlertTriangle style={{ width: '1rem', height: '1rem' }} /> Approval Needed
+                    ) : step.requiresApproval || step.executionStatus === 'REQUIRES_CONFIRMATION' ? (
+                      <span style={{ color: '#b45309', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8125rem' }}>
+                        <AlertTriangle style={{ width: '1rem', height: '1rem' }} /> Confirmation Needed
                       </span>
-                    ) : step.blocked ? (
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>Blocked</span>
+                    ) : step.blocked || step.executionStatus === 'BLOCKED' || step.executionStatus === 'SKIPPED_DUE_TO_DEPENDENCY' ? (
+                      <span style={{ color: '#64748b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8125rem' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#94a3b8' }} /> BLOCKED
+                      </span>
                     ) : (
-                      <span style={{ color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <XCircle style={{ width: '1rem', height: '1rem' }} /> Failed
+                      <span style={{ color: '#b91c1c', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8125rem' }}>
+                        <XCircle style={{ width: '1rem', height: '1rem' }} /> FAILED
                       </span>
                     )}
                   </td>
@@ -347,12 +421,12 @@ export const AiAssistant: React.FC = () => {
 
           {report.rememberedContext && Object.keys(report.rememberedContext).filter((k) => !k.includes('base64')).length > 0 && (
             <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              <strong>Reused Variables:</strong>{' '}
+              <strong>Propagated Runtime Variables:</strong>{' '}
               {Object.entries(report.rememberedContext)
                 .filter(([k]) => !k.includes('base64'))
                 .map(([k, v]) => (
-                  <span key={k} className="pill-badge pill-badge-purple" style={{ marginLeft: '0.375rem' }}>
-                    {k}: {v}
+                  <span key={k} className="pill-badge pill-badge-purple" style={{ marginLeft: '0.375rem', fontFamily: 'var(--font-mono)' }}>
+                    {k}: {k.toLowerCase().includes('token') || k.toLowerCase().includes('key') ? '••••••••' : v}
                   </span>
                 ))}
             </div>
@@ -667,6 +741,18 @@ export const AiAssistant: React.FC = () => {
           if (deleteConfirmId) handleDelete(deleteConfirmId);
         }}
         onClose={() => setDeleteConfirmId(null)}
+      />
+
+      {/* Autonomous AI Test Session & Input Collection Modal */}
+      <AiTestInputModal
+        isOpen={sessionModalOpen}
+        onClose={() => setSessionModalOpen(false)} // Closing does not destroy the waiting session
+        session={currentSession}
+        apiKeys={apiKeys}
+        loading={runningTest}
+        onProvideInput={handleProvideSessionInput}
+        onContinueTest={executeFullTestSuite}
+        onCancelTest={handleCancelSessionTest}
       />
     </div>
   );

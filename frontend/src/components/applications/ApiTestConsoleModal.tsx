@@ -2009,38 +2009,61 @@ export const ApiTestConsoleModal: React.FC<ApiTestConsoleModalProps> = ({
                 <table className="ai-step-table">
                   <thead>
                     <tr>
+                      <th style={{ width: '35px' }}>#</th>
                       <th>Method</th>
                       <th>Resolved Endpoint</th>
                       <th>Status</th>
                       <th>Latency</th>
-                      <th>Result</th>
+                      <th>Execution Result</th>
                     </tr>
                   </thead>
                   <tbody>
                     {aiReport.stepResults.map((step, idx) => (
                       <tr key={idx}>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{idx + 1}</td>
                         <td>
-                          <span className={`pill-badge ${step.method === 'GET' ? 'pill-badge-green' : step.method === 'POST' ? 'pill-badge-blue' : 'pill-badge-amber'}`}>
+                          <span className={`method-pill ${
+                            step.method === 'GET' ? 'method-pill-get' :
+                            step.method === 'POST' ? 'method-pill-post' :
+                            step.method === 'PUT' || step.method === 'PATCH' ? 'method-pill-put' :
+                            step.method === 'DELETE' ? 'method-pill-delete' : 'method-pill-other'
+                          }`}>
                             {step.method}
                           </span>
                         </td>
-                        <td style={{ fontFamily: 'var(--font-mono)' }}>{step.resolvedPath || step.endpoint}</td>
+                        <td>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                            {step.resolvedPath || step.endpoint}
+                          </div>
+                          {step.blockedReason && (
+                            <div style={{ fontSize: '0.75rem', color: '#b45309', marginTop: '0.15rem' }}>
+                              ↳ {step.blockedReason}
+                            </div>
+                          )}
+                          {step.error && !step.blocked && (
+                            <div style={{ fontSize: '0.75rem', color: '#b91c1c', marginTop: '0.15rem' }}>
+                              ↳ {step.error}
+                            </div>
+                          )}
+                        </td>
                         <td>{step.status > 0 ? step.status : '-'}</td>
                         <td>{step.latencyMs}ms</td>
                         <td>
                           {step.passed ? (
-                            <span style={{ color: '#047857', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <CheckCircle2 style={{ width: 12, height: 12 }} /> 200 OK
+                            <span style={{ color: '#047857', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8125rem' }}>
+                              <CheckCircle2 style={{ width: 14, height: 14 }} /> PASSED
                             </span>
-                          ) : step.requiresApproval ? (
-                            <span style={{ color: '#b45309', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <AlertTriangle style={{ width: 12, height: 12 }} /> Approval Needed
+                          ) : step.requiresApproval || step.executionStatus === 'REQUIRES_CONFIRMATION' ? (
+                            <span style={{ color: '#b45309', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8125rem' }}>
+                              <AlertTriangle style={{ width: 14, height: 14 }} /> Confirmation Needed
                             </span>
-                          ) : step.blocked ? (
-                            <span style={{ color: '#64748b', fontWeight: 600 }}>🚫 Blocked</span>
+                          ) : step.blocked || step.executionStatus === 'BLOCKED' || step.executionStatus === 'SKIPPED_DUE_TO_DEPENDENCY' ? (
+                            <span style={{ color: '#64748b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8125rem' }}>
+                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#94a3b8' }} /> BLOCKED
+                            </span>
                           ) : (
-                            <span style={{ color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <XCircle style={{ width: 12, height: 12 }} /> {step.error || step.status}
+                            <span style={{ color: '#b91c1c', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8125rem' }}>
+                              <XCircle style={{ width: 14, height: 14 }} /> FAILED
                             </span>
                           )}
                         </td>
@@ -2051,12 +2074,12 @@ export const ApiTestConsoleModal: React.FC<ApiTestConsoleModalProps> = ({
 
                 {aiReport.rememberedContext && Object.keys(aiReport.rememberedContext).filter((k) => !k.includes('base64')).length > 0 && (
                   <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                    <strong>Reused Variables:</strong>{' '}
+                    <strong>Propagated Runtime Variables:</strong>{' '}
                     {Object.entries(aiReport.rememberedContext)
                       .filter(([k]) => !k.includes('base64'))
                       .map(([k, v]) => (
-                        <span key={k} className="pill-badge pill-badge-purple" style={{ marginLeft: '0.375rem' }}>
-                          {k}: {v}
+                        <span key={k} className="pill-badge pill-badge-purple" style={{ marginLeft: '0.375rem', fontFamily: 'var(--font-mono)' }}>
+                          {k}: {k.toLowerCase().includes('token') || k.toLowerCase().includes('key') ? '••••••••' : v}
                         </span>
                       ))}
                   </div>

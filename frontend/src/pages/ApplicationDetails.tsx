@@ -11,7 +11,7 @@ import { ErrorBanner } from '../components/common/ErrorBanner';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { ConnectionTestCard } from '../components/applications/ConnectionTestCard';
 import { ConnectionAccessCard } from '../components/applications/ConnectionAccessCard';
-import { ConnectApplicationModal } from '../components/applications/ConnectApplicationModal';
+import { ImportApiModal } from '../components/applications/ImportApiModal';
 import { ApiTestConsoleModal } from '../components/applications/ApiTestConsoleModal';
 import { EditApplicationModal } from '../components/applications/EditApplicationModal';
 import { RequestLogsTable } from '../components/applications/RequestLogsTable';
@@ -845,13 +845,12 @@ export const ApplicationDetails: React.FC = () => {
         onClose={() => setSelectedKeyForAnalytics(null)}
       />
 
-      {/* Simplified Import & Auto-Discover Modal */}
+      {/* Import APIs Modal for Current Application */}
       {application && (
-        <ConnectApplicationModal
+        <ImportApiModal
           isOpen={isOpenApiModalOpen}
           onClose={() => setIsOpenApiModalOpen(false)}
-          initialAppName={application.name}
-          initialUrl={application.baseUrl}
+          application={application}
           onSuccess={() => {
             fetchEndpoints();
             fetchMetrics();

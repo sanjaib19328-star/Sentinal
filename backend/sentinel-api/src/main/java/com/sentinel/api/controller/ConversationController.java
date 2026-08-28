@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -159,5 +160,40 @@ public class ConversationController {
         request.setApplicationId(applicationId);
         com.sentinel.api.dto.BulkApiCheckResponse response = aiTestEngineService.executeBulkApiCheck(principal.getId(), request);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/applications/{applicationId}/ai-test-session")
+    public ResponseEntity<com.sentinel.api.dto.AiTestSessionDto> getAiTestSession(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable Long applicationId
+    ) {
+        com.sentinel.api.dto.AiTestSessionDto session = aiTestEngineService.getOrCreateSession(principal.getId(), applicationId);
+        return ResponseEntity.ok(session);
+    }
+
+    @PostMapping("/applications/{applicationId}/ai-test-session/input")
+    public ResponseEntity<com.sentinel.api.dto.AiTestSessionDto> provideSessionInput(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable Long applicationId,
+        @RequestBody Map<String, String> body
+    ) {
+        String inputKey = body.get("inputKey");
+        String inputValue = body.get("inputValue");
+        String fileBase64 = body.get("fileBase64");
+        String fileName = body.get("fileName");
+        String fileContentType = body.get("fileContentType");
+        com.sentinel.api.dto.AiTestSessionDto session = aiTestEngineService.provideSessionInput(
+            principal.getId(), applicationId, inputKey, inputValue, fileBase64, fileName, fileContentType
+        );
+        return ResponseEntity.ok(session);
+    }
+
+    @DeleteMapping("/applications/{applicationId}/ai-test-session")
+    public ResponseEntity<Void> cancelAiTestSession(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable Long applicationId
+    ) {
+        aiTestEngineService.cancelSession(principal.getId(), applicationId);
+        return ResponseEntity.noContent().build();
     }
 }

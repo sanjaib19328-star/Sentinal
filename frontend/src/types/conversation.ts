@@ -57,6 +57,16 @@ export interface SendMessageRequest {
   fileContentType?: string;
 }
 
+export interface AiTestMissingInput {
+  inputKey: string;
+  inputType: 'FILE' | 'API_KEY' | 'VARIABLE' | 'CONFIRMATION' | 'HEADER';
+  targetEndpoint: string;
+  targetMethod: string;
+  prompt: string;
+  received?: boolean;
+  valuePreview?: string;
+}
+
 export interface AiTestStep {
   stepId: string;
   name: string;
@@ -66,12 +76,18 @@ export interface AiTestStep {
   destructive: boolean;
   requiresApproval: boolean;
   dependsOnStepIds: string[];
+  requiredVariables?: string[];
+  producedVariables?: string[];
   extractedVariables: Record<string, string>;
   parameterMappings: Record<string, string>;
   requestBodyTemplate?: string;
   requestContentType?: string;
   multipart: boolean;
   multipartFieldName?: string;
+  requiresInput?: boolean;
+  missingInputType?: string;
+  missingInputPrompt?: string;
+  level?: number;
 }
 
 export interface AiTestPlan {
@@ -82,6 +98,8 @@ export interface AiTestPlan {
   summary: string;
   totalEndpointsDiscovered: number;
   totalStepsPlanned: number;
+  status: 'READY' | 'WAITING_FOR_INPUT' | 'REQUIRES_CONFIRMATION';
+  missingInputs?: AiTestMissingInput[];
   steps: AiTestStep[];
 }
 
@@ -98,6 +116,8 @@ export interface AiTestStepResult {
   skipped: boolean;
   blocked: boolean;
   requiresApproval: boolean;
+  executionStatus?: 'PASSED' | 'FAILED' | 'BLOCKED' | 'SKIPPED_DUE_TO_DEPENDENCY' | 'REQUIRES_CONFIRMATION';
+  blockedReason?: string;
   error?: string;
   responseSummary?: string;
   inputsUsed: Record<string, string>;
@@ -120,6 +140,25 @@ export interface AiTestRunReport {
   failureAnalysis?: string;
   rememberedContext: Record<string, string>;
   stepResults: AiTestStepResult[];
+}
+
+export interface AiTestSession {
+  sessionId: string;
+  applicationId: number;
+  applicationName: string;
+  status: 'PLANNING' | 'WAITING_FOR_INPUT' | 'READY' | 'RUNNING' | 'PASSED' | 'FAILED' | 'PARTIAL' | 'NEEDS_APPROVAL' | 'CANCELLED';
+  statusMessage: string;
+  plan?: AiTestPlan;
+  missingInputs: AiTestMissingInput[];
+  providedInputs: Record<string, string>;
+  fileBase64?: string;
+  fileName?: string;
+  fileContentType?: string;
+  apiKeyId?: number;
+  approveDestructiveOperations?: boolean;
+  lastReport?: AiTestRunReport;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface RunAiTestRequest {

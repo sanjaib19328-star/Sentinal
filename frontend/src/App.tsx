@@ -13,6 +13,7 @@ import { ApplicationKeys } from './pages/ApplicationKeys';
 import { GlobalApiCatalog } from './pages/GlobalApiCatalog';
 import { RequestExplorer } from './pages/RequestExplorer';
 import { AiAssistant } from './pages/AiAssistant';
+import { Profile } from './pages/Profile';
 import { NotFound } from './pages/NotFound';
 
 export const App: React.FC = () => {
@@ -41,8 +42,9 @@ export const App: React.FC = () => {
             <Route path="apis" element={<GlobalApiCatalog />} />
             <Route path="assistant" element={<AiAssistant />} />
             <Route path="requests" element={<RequestExplorer />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="analytics" element={<Navigate to="/dashboard" replace />} />
-            <Route path="settings" element={<Navigate to="/dashboard" replace />} />
+            <Route path="settings" element={<Profile />} />
             <Route path="alerts" element={<Navigate to="/dashboard" replace />} />
           </Route>
 

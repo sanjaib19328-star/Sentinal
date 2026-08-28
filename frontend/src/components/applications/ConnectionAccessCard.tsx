@@ -108,7 +108,7 @@ export const ConnectionAccessCard: React.FC<ConnectionAccessCardProps> = ({
             style={{ gap: '0.375rem' }}
           >
             <FileCode style={{ width: 14, height: 14 }} />
-            Discover / Import OpenAPI
+            Import APIs
           </button>
           <button
             type="button"
@@ -435,7 +435,7 @@ export const ConnectionAccessCard: React.FC<ConnectionAccessCardProps> = ({
               style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', gap: '0.25rem', color: 'var(--primary)' }}
             >
               <FileCode style={{ width: 12, height: 12 }} />
-              <span>Import Spec</span>
+              <span>Import APIs</span>
             </button>
           </div>
         </div>

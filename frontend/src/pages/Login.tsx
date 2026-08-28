@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { ShieldCheck, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getErrorMessage } from '../api/client';
 
 export const Login: React.FC = () => {
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,8 +16,23 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const rawFrom = (location.state as { from?: { pathname?: string } })?.from?.pathname;
-  const from = (rawFrom && !rawFrom.startsWith('/src') && !rawFrom.includes('.')) ? rawFrom : '/dashboard';
+  // Extract destination from query parameters or router state
+  const queryRedirect = searchParams.get('redirect') || searchParams.get('from');
+  const locationStateFrom = (location.state as { from?: { pathname?: string; search?: string; hash?: string } })?.from;
+  const stateFromPath = locationStateFrom
+    ? `${locationStateFrom.pathname || ''}${locationStateFrom.search || ''}${locationStateFrom.hash || ''}`
+    : null;
+
+  const rawDestination = queryRedirect || stateFromPath || '/dashboard';
+  const destination = (!rawDestination.startsWith('/src') && !rawDestination.includes('.') && rawDestination !== '/login' && rawDestination !== '/register')
+    ? (rawDestination === '/' ? '/dashboard' : rawDestination)
+    : '/dashboard';
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      navigate(destination, { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate, destination]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +46,7 @@ export const Login: React.FC = () => {
 
     try {
       await login({ email: email.trim(), password });
-      navigate(from, { replace: true });
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

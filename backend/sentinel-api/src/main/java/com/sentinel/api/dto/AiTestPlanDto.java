@@ -12,6 +12,8 @@ public class AiTestPlanDto {
     private String summary;
     private int totalEndpointsDiscovered;
     private int totalStepsPlanned;
+    private String status = "READY"; // "READY", "WAITING_FOR_INPUT", "REQUIRES_CONFIRMATION"
+    private List<AiTestMissingInputDto> missingInputs = new ArrayList<>();
     private List<AiTestStepDto> steps = new ArrayList<>();
 
     public AiTestPlanDto() {}
@@ -78,5 +80,21 @@ public class AiTestPlanDto {
 
     public void setSteps(List<AiTestStepDto> steps) {
         this.steps = steps;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public List<AiTestMissingInputDto> getMissingInputs() {
+        return missingInputs;
+    }
+
+    public void setMissingInputs(List<AiTestMissingInputDto> missingInputs) {
+        this.missingInputs = missingInputs;
     }
 }

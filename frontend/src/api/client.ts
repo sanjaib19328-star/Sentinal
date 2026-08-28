@@ -1,6 +1,8 @@
 import axios, { AxiosError } from 'axios';
+import { User } from '../types/auth';
 
 const TOKEN_KEY = 'sentinel_jwt_token';
+const USER_KEY = 'sentinel_user';
 
 export const getStoredToken = (): string | null => {
   try {
@@ -23,6 +25,31 @@ export const removeStoredToken = (): void => {
     localStorage.removeItem(TOKEN_KEY);
   } catch (e) {
     console.error('Failed to remove token', e);
+  }
+};
+
+export const getStoredUser = (): User | null => {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const setStoredUser = (user: User): void => {
+  try {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch (e) {
+    console.error('Failed to persist user', e);
+  }
+};
+
+export const removeStoredUser = (): void => {
+  try {
+    localStorage.removeItem(USER_KEY);
+  } catch (e) {
+    console.error('Failed to remove user', e);
   }
 };
 
@@ -58,6 +85,7 @@ apiClient.interceptors.response.use(
       const currentPath = window.location.pathname;
       if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
         removeStoredToken();
+        removeStoredUser();
         window.dispatchEvent(new CustomEvent('sentinel:unauthorized'));
       }
     }

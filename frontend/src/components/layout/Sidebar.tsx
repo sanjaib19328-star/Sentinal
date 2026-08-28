@@ -17,6 +17,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onCloseMobile }) => {
     { to: '/apis', label: 'API Catalog', icon: Compass },
     { to: '/assistant', label: 'AI Assistant', icon: Sparkles },
     { to: '/requests', label: 'Request Explorer', icon: FileText },
+    { to: '/profile', label: 'Developer Profile', icon: ShieldCheck },
   ];
 
   return (
@@ -172,14 +173,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onCloseMobile }) => {
         {/* User Info & Logout */}
         <div style={{ padding: '1rem', borderTop: '1px solid var(--border-color)', backgroundColor: '#fafafa' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <div style={{ minWidth: 0 }}>
+            <Link to="/profile" style={{ minWidth: 0, textDecoration: 'none', display: 'block' }}>
               <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                 {user?.name || 'Operator'}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                 {user?.email}
               </div>
-            </div>
+            </Link>
           </div>
           <button
             onClick={logout}

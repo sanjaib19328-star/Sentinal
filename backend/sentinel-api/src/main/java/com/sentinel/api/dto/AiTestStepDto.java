@@ -15,12 +15,18 @@ public class AiTestStepDto {
     private boolean destructive;
     private boolean requiresApproval;
     private List<String> dependsOnStepIds = new ArrayList<>();
+    private List<String> requiredVariables = new ArrayList<>();
+    private List<String> producedVariables = new ArrayList<>();
     private Map<String, String> extractedVariables = new HashMap<>(); // e.g. "image_id" -> "response.body.image_id"
     private Map<String, String> parameterMappings = new HashMap<>(); // e.g. "image_id" -> "{image_id}"
     private String requestBodyTemplate;
     private String requestContentType;
     private boolean isMultipart;
     private String multipartFieldName;
+    private boolean requiresInput;
+    private String missingInputType;
+    private String missingInputPrompt;
+    private int level;
 
     public AiTestStepDto() {}
 
@@ -134,5 +140,53 @@ public class AiTestStepDto {
 
     public void setMultipartFieldName(String multipartFieldName) {
         this.multipartFieldName = multipartFieldName;
+    }
+
+    public List<String> getRequiredVariables() {
+        return requiredVariables;
+    }
+
+    public void setRequiredVariables(List<String> requiredVariables) {
+        this.requiredVariables = requiredVariables;
+    }
+
+    public List<String> getProducedVariables() {
+        return producedVariables;
+    }
+
+    public void setProducedVariables(List<String> producedVariables) {
+        this.producedVariables = producedVariables;
+    }
+
+    public boolean isRequiresInput() {
+        return requiresInput;
+    }
+
+    public void setRequiresInput(boolean requiresInput) {
+        this.requiresInput = requiresInput;
+    }
+
+    public String getMissingInputType() {
+        return missingInputType;
+    }
+
+    public void setMissingInputType(String missingInputType) {
+        this.missingInputType = missingInputType;
+    }
+
+    public String getMissingInputPrompt() {
+        return missingInputPrompt;
+    }
+
+    public void setMissingInputPrompt(String missingInputPrompt) {
+        this.missingInputPrompt = missingInputPrompt;
+    }
+
+    public int getLevel() {
+        return level;
+    }
+
+    public void setLevel(int level) {
+        this.level = level;
     }
 }

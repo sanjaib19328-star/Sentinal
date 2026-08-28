@@ -17,6 +17,8 @@ public class AiTestStepResultDto {
     private boolean skipped;
     private boolean blocked;
     private boolean requiresApproval;
+    private String executionStatus; // "PASSED", "FAILED", "BLOCKED", "SKIPPED_DUE_TO_DEPENDENCY", "REQUIRES_CONFIRMATION"
+    private String blockedReason;
     private String error;
     private String responseSummary;
     private Map<String, String> inputsUsed = new HashMap<>();
@@ -150,5 +152,21 @@ public class AiTestStepResultDto {
 
     public void setOutputsExtracted(Map<String, String> outputsExtracted) {
         this.outputsExtracted = outputsExtracted;
+    }
+
+    public String getExecutionStatus() {
+        return executionStatus;
+    }
+
+    public void setExecutionStatus(String executionStatus) {
+        this.executionStatus = executionStatus;
+    }
+
+    public String getBlockedReason() {
+        return blockedReason;
+    }
+
+    public void setBlockedReason(String blockedReason) {
+        this.blockedReason = blockedReason;
     }
 }

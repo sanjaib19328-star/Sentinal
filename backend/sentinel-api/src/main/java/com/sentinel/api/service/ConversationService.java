@@ -272,11 +272,24 @@ public class ConversationService {
 
         AiTestRunReportDto report = aiTestEngineService.executeAiTestRun(userId, request);
 
-        // Record User Action
+        // Record User Action with details of what was sent
+        StringBuilder userMsgText = new StringBuilder();
+        userMsgText.append("🚀 **Run Autonomous AI Test Suite**\n");
+        userMsgText.append("- **Target Application:** ").append(report.getApplicationName()).append(" (ID: ").append(report.getApplicationId()).append(")\n");
+        if (request.getFileName() != null && !request.getFileName().isBlank()) {
+            userMsgText.append("- **Provided Test Payload:** `").append(request.getFileName()).append("` (Multipart file attached)\n");
+        }
+        if (request.isApproveDestructiveOperations()) {
+            userMsgText.append("- **Permissions:** State-changing/clean operations approved\n");
+        }
+        if (request.getInitialContext() != null && !request.getInitialContext().isEmpty()) {
+            userMsgText.append("- **Provided Context:** ").append(request.getInitialContext().keySet()).append("\n");
+        }
+
         ConversationMessage userMsg = new ConversationMessage(
             conversation,
             MessageSender.USER,
-            "Triggered Autonomous AI API Test Suite for " + report.getApplicationName() + ".",
+            userMsgText.toString(),
             null
         );
         messageRepository.save(userMsg);
@@ -339,28 +352,46 @@ public class ConversationService {
         sb.append("**Avg Latency:** `").append(String.format("%.1f", report.getAvgLatencyMs())).append("ms`\n\n");
         sb.append(report.getExecutiveSummary()).append("\n\n");
 
-        sb.append("| Method | Endpoint | Status | Latency | Result |\n");
-        sb.append("| :--- | :--- | :--- | :--- | :--- |\n");
+        sb.append("| # | Method | Endpoint / Resolved Path | Status | Latency | Result |\n");
+        sb.append("| :--- | :--- | :--- | :--- | :--- | :--- |\n");
+        int stepNum = 1;
         for (AiTestStepResultDto step : report.getStepResults()) {
-            String resIcon = step.isPassed() ? "200 OK" : (step.isRequiresApproval() ? "Approval Needed" : (step.isBlocked() ? "Blocked" : String.valueOf(step.getStatus())));
-            sb.append("| `").append(step.getMethod()).append("` | `")
-              .append(step.getResolvedPath() != null ? step.getResolvedPath() : step.getEndpoint()).append("` | ")
+            String resText;
+            if (step.isPassed()) {
+                resText = "✅ PASSED";
+            } else if (step.isRequiresApproval() || "REQUIRES_CONFIRMATION".equals(step.getExecutionStatus())) {
+                resText = "⚠️ Confirmation Needed";
+            } else if (step.isBlocked() || "BLOCKED".equals(step.getExecutionStatus()) || "SKIPPED_DUE_TO_DEPENDENCY".equals(step.getExecutionStatus())) {
+                resText = "🚫 BLOCKED";
+            } else {
+                resText = "❌ FAILED (" + (step.getStatus() > 0 ? step.getStatus() : "Error") + ")";
+            }
+
+            String pathCol = step.getResolvedPath() != null ? step.getResolvedPath() : step.getEndpoint();
+            if (step.getBlockedReason() != null && !step.getBlockedReason().isBlank()) {
+                pathCol += "<br>↳ *Reason: " + step.getBlockedReason() + "*";
+            }
+
+            sb.append("| ").append(stepNum++).append(" | `").append(step.getMethod()).append("` | `")
+              .append(pathCol).append("` | ")
               .append(step.getStatus() > 0 ? step.getStatus() : "-").append(" | ")
               .append(step.getLatencyMs()).append("ms | ")
-              .append(resIcon).append(" |\n");
+              .append(resText).append(" |\n");
         }
 
         if (report.getRememberedContext() != null && !report.getRememberedContext().isEmpty()) {
-            sb.append("\n**Reused Context Variables:**\n");
+            sb.append("\n**Propagated Context Variables:**\n");
             for (Map.Entry<String, String> e : report.getRememberedContext().entrySet()) {
                 if (!e.getKey().contains("base64")) {
-                    sb.append("- `").append(e.getKey()).append("`: `").append(e.getValue()).append("`\n");
+                    String val = e.getKey().toLowerCase().contains("token") || e.getKey().toLowerCase().contains("key")
+                        ? "••••••••" : e.getValue();
+                    sb.append("- `").append(e.getKey()).append("`: `").append(val).append("`\n");
                 }
             }
         }
 
         if (report.getFailureAnalysis() != null && !report.getFailureAnalysis().isBlank()) {
-            sb.append("\n**Failure Analysis:**\n").append(report.getFailureAnalysis()).append("\n");
+            sb.append("\n**Dependency & Execution Notes:**\n").append(report.getFailureAnalysis()).append("\n");
         }
 
         return sb.toString();

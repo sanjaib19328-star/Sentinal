@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ApiEndpoint } from '../../types/application';
 import { ApiDetailsModal } from './ApiDetailsModal';
-import { ConnectApplicationModal } from './ConnectApplicationModal';
+import { ImportApiModal } from './ImportApiModal';
 import { ApiTestConsoleModal } from './ApiTestConsoleModal';
 import { BulkApiCheckModal } from './BulkApiCheckModal';
 import { LoadingSpinner } from '../common/LoadingSpinner';
@@ -16,6 +16,7 @@ import {
   CheckCircle,
   BookOpen,
   Sparkles,
+  FileCode,
 } from 'lucide-react';
 
 interface ApiCatalogTabProps {
@@ -133,8 +134,8 @@ export const ApiCatalogTab: React.FC<ApiCatalogTabProps> = ({
             className="btn btn-primary btn-sm flex items-center gap-1.5"
             style={{ height: '34px', padding: '0 0.875rem' }}
           >
-            <Sparkles style={{ width: '0.875rem', height: '0.875rem' }} />
-            Import & Discover APIs
+            <FileCode style={{ width: '0.875rem', height: '0.875rem' }} />
+            Import APIs
           </button>
 
           <button
@@ -394,10 +395,10 @@ export const ApiCatalogTab: React.FC<ApiCatalogTabProps> = ({
         onClose={() => setSelectedEndpoint(null)}
       />
 
-      {/* Simplified Connect & Auto-Discover Modal */}
-      <ConnectApplicationModal
+      {/* Import APIs Modal for Current Application */}
+      <ImportApiModal
         isOpen={isConnectModalOpen}
-        initialUrl={applicationBaseUrl}
+        application={{ id: applicationId, name: 'Current Application', baseUrl: applicationBaseUrl || '' } as any}
         onClose={() => setIsConnectModalOpen(false)}
         onSuccess={() => {
           setIsConnectModalOpen(false);

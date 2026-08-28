@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Menu, Activity } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -42,7 +43,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-        <div
+        <Link
+          to="/profile"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -54,11 +56,13 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
             fontSize: '0.8125rem',
             fontWeight: 500,
             color: 'var(--text-secondary)',
+            textDecoration: 'none',
+            cursor: 'pointer',
           }}
         >
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--success)' }} />
           <span>{user?.name || 'User'}</span>
-        </div>
+        </Link>
       </div>
 
       <style>{`
