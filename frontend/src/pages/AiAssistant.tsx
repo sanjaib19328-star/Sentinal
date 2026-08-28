@@ -24,6 +24,7 @@ import { Application } from '../types/application';
 import { ApiKey } from '../types/apiKey';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { MarkdownViewer } from '../components/common/MarkdownViewer';
 
 export const AiAssistant: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -527,32 +528,39 @@ export const AiAssistant: React.FC = () => {
                 <Sparkles style={{ width: '1.75rem', height: '1.75rem' }} />
               </div>
               <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-                Autonomous AI API Testing
+                Sentinel AI Observability Copilot
               </h3>
               <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-                Ask Sentinel AI to test endpoints, resolve dependencies (like extracting <code>image_id</code> from upload), remember inputs, or diagnose route failures.
+                Interact with Sentinel's live database, API catalog, telemetry, and automated gateway test engine.
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <button
                   className="btn btn-secondary btn-sm"
-                  onClick={() => setPrompt('Test all APIs in this application.')}
-                  style={{ textAlign: 'left', justifyContent: 'flex-start' }}
+                  onClick={() => setPrompt('give list of apis')}
+                  style={{ textAlign: 'left', justifyContent: 'flex-start', fontSize: '0.8125rem' }}
                 >
-                  ⚡ "Test all APIs in this application"
+                  ⚡ "give list of apis"
                 </button>
                 <button
                   className="btn btn-secondary btn-sm"
-                  onClick={() => setPrompt('Upload a test image and verify the image_id analysis flow.')}
-                  style={{ textAlign: 'left', justifyContent: 'flex-start' }}
+                  onClick={() => setPrompt('show the health status of all applications')}
+                  style={{ textAlign: 'left', justifyContent: 'flex-start', fontSize: '0.8125rem' }}
                 >
-                  🖼️ "Upload a test image and verify the image_id analysis flow"
+                  🩺 "show the health status of all applications"
                 </button>
                 <button
                   className="btn btn-secondary btn-sm"
-                  onClick={() => setPrompt('Diagnose recent latency and error telemetry.')}
-                  style={{ textAlign: 'left', justifyContent: 'flex-start' }}
+                  onClick={() => setPrompt('give me the system overview')}
+                  style={{ textAlign: 'left', justifyContent: 'flex-start', fontSize: '0.8125rem' }}
                 >
-                  🔍 "Diagnose recent latency and error telemetry"
+                  🌐 "give me the system overview"
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setPrompt('are there any unhealthy applications?')}
+                  style={{ textAlign: 'left', justifyContent: 'flex-start', fontSize: '0.8125rem' }}
+                >
+                  ⚠️ "are there any unhealthy applications?"
                 </button>
               </div>
             </div>
@@ -560,7 +568,11 @@ export const AiAssistant: React.FC = () => {
             activeConversation.messages.map((msg) => (
               <div key={msg.id} className={`ai-message-bubble ${msg.sender.toLowerCase()}`}>
                 <div className="ai-message-content">
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                  {msg.sender === 'USER' ? (
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                  ) : (
+                    <MarkdownViewer content={msg.content} />
+                  )}
                   {renderStructuredReport(msg.metadataJson)}
                 </div>
               </div>

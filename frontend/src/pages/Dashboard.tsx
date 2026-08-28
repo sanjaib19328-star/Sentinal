@@ -205,64 +205,76 @@ export const Dashboard: React.FC = () => {
           )}
 
           {/* Primary KPI Metrics Cards */}
-          <div className="grid-stats" style={{ marginBottom: '1.5rem' }}>
-            <div className="stat-card">
-              <div className="stat-label">
-                <Layers style={{ width: '1rem', height: '1rem', color: 'var(--primary)' }} />
-                <span>Applications</span>
+          <div className="kpi-grid">
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <span className="kpi-title">Applications</span>
+                <div className="kpi-icon-pill" style={{ backgroundColor: '#eff6ff', color: 'var(--primary)' }}>
+                  <Layers style={{ width: '1rem', height: '1rem' }} />
+                </div>
               </div>
-              <div className="stat-value">{totalApps}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                {healthyApps} Healthy · {degradedApps} Degraded · {unavailableApps} Down
+              <div className="kpi-value">{totalApps}</div>
+              <div className="kpi-footer">
+                <span style={{ color: 'var(--success)' }}>{healthyApps} Healthy</span> · 
+                <span style={{ color: degradedApps > 0 ? 'var(--warning)' : 'inherit' }}>{degradedApps} Degraded</span> · 
+                <span style={{ color: unavailableApps > 0 ? 'var(--danger)' : 'inherit' }}>{unavailableApps} Down</span>
               </div>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-label">
-                <Activity style={{ width: '1rem', height: '1rem', color: 'var(--primary)' }} />
-                <span>Total Gateway Requests</span>
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <span className="kpi-title">Gateway Traffic</span>
+                <div className="kpi-icon-pill" style={{ backgroundColor: '#eff6ff', color: 'var(--primary)' }}>
+                  <Activity style={{ width: '1rem', height: '1rem' }} />
+                </div>
               </div>
-              <div className="stat-value">{summary ? summary.totalRequests.toLocaleString() : '0'}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              <div className="kpi-value">{summary ? summary.totalRequests.toLocaleString() : '0'}</div>
+              <div className="kpi-footer">
                 Throughput: {summary ? summary.requestsPerMinute : 0} req/min
               </div>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-label">
-                <CheckCircle2 style={{ width: '1rem', height: '1rem', color: 'var(--success)' }} />
-                <span>Success Rate</span>
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <span className="kpi-title">Success Rate</span>
+                <div className="kpi-icon-pill" style={{ backgroundColor: '#ecfdf5', color: 'var(--success)' }}>
+                  <CheckCircle2 style={{ width: '1rem', height: '1rem' }} />
+                </div>
               </div>
-              <div className="stat-value" style={{ color: 'var(--success-text)' }}>
+              <div className="kpi-value" style={{ color: 'var(--success-text)' }}>
                 {summary ? `${summary.overallSuccessRate}%` : '100%'}
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                Error Rate: {summary ? `${summary.overallErrorRate}%` : '0%'}
+              <div className="kpi-footer">
+                Error Rate: <strong style={{ color: summary && summary.overallErrorRate > 0 ? 'var(--danger)' : 'inherit' }}>{summary ? `${summary.overallErrorRate}%` : '0%'}</strong>
               </div>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-label">
-                <Zap style={{ width: '1rem', height: '1rem', color: 'var(--warning)' }} />
-                <span>429 Throttled Rate</span>
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <span className="kpi-title">429 Throttled</span>
+                <div className="kpi-icon-pill" style={{ backgroundColor: '#fffbeb', color: 'var(--warning)' }}>
+                  <Zap style={{ width: '1rem', height: '1rem' }} />
+                </div>
               </div>
-              <div className="stat-value" style={{ color: summary && summary.overall429Rate > 0 ? 'var(--warning-text)' : 'inherit' }}>
+              <div className="kpi-value" style={{ color: summary && summary.overall429Rate > 0 ? 'var(--warning-text)' : 'inherit' }}>
                 {summary ? `${summary.overall429Rate}%` : '0%'}
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              <div className="kpi-footer">
                 Multi-level rate limit & quotas
               </div>
             </div>
 
-            <div className="stat-card">
-              <div className="stat-label">
-                <Clock style={{ width: '1rem', height: '1rem', color: 'var(--primary)' }} />
-                <span>Avg / P95 Latency</span>
+            <div className="kpi-card">
+              <div className="kpi-header">
+                <span className="kpi-title">Avg / P95 Latency</span>
+                <div className="kpi-icon-pill" style={{ backgroundColor: '#eff6ff', color: 'var(--primary)' }}>
+                  <Clock style={{ width: '1rem', height: '1rem' }} />
+                </div>
               </div>
-              <div className="stat-value">
+              <div className="kpi-value">
                 {summary ? `${summary.avgLatencyMs}ms` : '0ms'}
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              <div className="kpi-footer">
                 P95 Percentile: {summary ? `${summary.p95LatencyMs}ms` : '0ms'}
               </div>
             </div>
@@ -297,27 +309,26 @@ export const Dashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {summary.topApis.map((api, idx) => (
-                        <tr key={idx}>
-                          <td>
-                            <span
-                              style={{
-                                padding: '0.2rem 0.5rem',
-                                borderRadius: '0.25rem',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                background: 'rgba(59, 130, 246, 0.12)',
-                                color: 'var(--primary)',
-                              }}
-                            >
-                              {api.method}
-                            </span>
-                          </td>
-                          <td style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>{api.normalizedPath}</td>
-                          <td style={{ textAlign: 'right', fontWeight: 600 }}>{api.count}</td>
-                          <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{Math.round(api.metricValue)}ms</td>
-                        </tr>
-                      ))}
+                      {summary.topApis.map((api, idx) => {
+                        const m = api.method.toUpperCase();
+                        let cls = 'method-pill-other';
+                        if (m === 'GET') cls = 'method-pill-get';
+                        else if (m === 'POST') cls = 'method-pill-post';
+                        else if (m === 'PUT' || m === 'PATCH') cls = 'method-pill-put';
+                        else if (m === 'DELETE') cls = 'method-pill-delete';
+                        return (
+                          <tr key={idx}>
+                            <td>
+                              <span className={`method-pill ${cls}`}>
+                                {m}
+                              </span>
+                            </td>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', fontWeight: 600 }}>{api.normalizedPath}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>{api.count.toLocaleString()}</td>
+                            <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{Math.round(api.metricValue)}ms</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -354,19 +365,21 @@ export const Dashboard: React.FC = () => {
                           <td>
                             <span
                               style={{
-                                padding: '0.2rem 0.4rem',
-                                borderRadius: '0.25rem',
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: 'var(--radius-sm)',
                                 fontSize: '0.75rem',
                                 fontWeight: 700,
-                                background: err.statusCode >= 500 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                color: err.statusCode >= 500 ? 'var(--danger)' : 'var(--warning)',
+                                fontFamily: 'var(--font-mono)',
+                                background: err.statusCode >= 500 ? '#fef2f2' : '#fffbeb',
+                                color: err.statusCode >= 500 ? '#b91c1c' : '#b45309',
+                                border: `1px solid ${err.statusCode >= 500 ? '#fecaca' : '#fde68a'}`,
                               }}
                             >
                               {err.statusCode}
                             </span>
                           </td>
-                          <td style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>
-                            <span style={{ fontWeight: 600 }}>{err.method}</span> {err.path}
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>
+                            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{err.method}</span> {err.path}
                           </td>
                           <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{err.latencyMs}ms</td>
                           <td style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)' }}>

@@ -77,16 +77,16 @@ export const GlobalApiCatalog: React.FC = () => {
   const getMethodBadgeClass = (method: string) => {
     switch (method.toUpperCase()) {
       case 'GET':
-        return 'badge-healthy';
+        return 'method-pill method-pill-get';
       case 'POST':
-        return 'badge-primary';
+        return 'method-pill method-pill-post';
       case 'PUT':
       case 'PATCH':
-        return 'badge-degraded';
+        return 'method-pill method-pill-put';
       case 'DELETE':
-        return 'badge-unavailable';
+        return 'method-pill method-pill-delete';
       default:
-        return 'badge-unknown';
+        return 'method-pill method-pill-other';
     }
   };
 
