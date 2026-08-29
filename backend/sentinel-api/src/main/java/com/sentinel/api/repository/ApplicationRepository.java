@@ -16,5 +16,9 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
         return findAllByOwnerId(ownerId);
     }
 
+    List<Application> findAllByActiveTrue();
+
+    List<Application> findAllByOwnerIdAndActiveTrue(Long ownerId);
+
     Optional<Application> findByIdAndOwnerId(Long id, Long ownerId);
 }

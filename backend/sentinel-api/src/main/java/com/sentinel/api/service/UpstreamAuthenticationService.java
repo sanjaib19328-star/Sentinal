@@ -273,10 +273,11 @@ public class UpstreamAuthenticationService {
         }
 
         List<String> probeCandidates;
-        if (targetBase.endsWith("/actuator/health") || targetBase.endsWith("/health")) {
+        if (targetBase.endsWith("/api/v1/health") || targetBase.endsWith("/actuator/health") || targetBase.endsWith("/health") || targetBase.endsWith("/ping") || targetBase.endsWith("/status")) {
             probeCandidates = List.of(targetBase);
         } else {
             probeCandidates = List.of(
+                targetBase + "/api/v1/health",
                 targetBase + "/actuator/health",
                 targetBase + "/health",
                 targetBase
@@ -310,6 +311,9 @@ public class UpstreamAuthenticationService {
                 }
             } catch (Exception ex) {
                 lastException = ex;
+                if (ex instanceof java.net.http.HttpTimeoutException || ex instanceof java.net.ConnectException || ex instanceof java.net.UnknownHostException || ex instanceof java.net.NoRouteToHostException || ex instanceof javax.net.ssl.SSLException) {
+                    break;
+                }
             }
         }
 
@@ -348,7 +352,17 @@ public class UpstreamAuthenticationService {
                 null
             );
 
-            return new ConnectionTestResponse(applicationId, false, HealthStatus.UNAVAILABLE, 502, null, "Connection failed: " + (lastException != null ? lastException.getClass().getSimpleName() : "Unreachable"), checkedAt);
+            String failureCategory = "UNREACHABLE";
+            if (lastException != null) {
+                if (lastException instanceof java.net.http.HttpTimeoutException || (lastException.getMessage() != null && lastException.getMessage().toLowerCase().contains("timed out"))) {
+                    failureCategory = "TIMEOUT";
+                } else if (lastException instanceof javax.net.ssl.SSLException) {
+                    failureCategory = "SSL_ERROR";
+                }
+            }
+            String failMessage = failureCategory + ": " + (lastException != null ? lastException.getMessage() : "Unreachable");
+
+            return new ConnectionTestResponse(applicationId, false, HealthStatus.UNAVAILABLE, 502, null, failMessage, checkedAt);
         }
     }
 

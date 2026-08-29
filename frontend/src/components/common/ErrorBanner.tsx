@@ -10,7 +10,7 @@ interface ErrorBannerProps {
 export const ErrorBanner: React.FC<ErrorBannerProps> = ({
   message,
   onRetry,
-  title = 'Observation Error',
+  title = 'Error',
 }) => {
   return (
     <div

@@ -120,8 +120,11 @@ export const getErrorMessage = (error: unknown): string => {
     if (error.response?.status === 500) {
       return 'Sentinel encountered an internal server error.';
     }
+    if (error.code === 'ECONNABORTED' || (error.message && error.message.toLowerCase().includes('timeout'))) {
+      return 'Sentinel backend request timed out. Please verify your connection or try again.';
+    }
     if (error.code === 'ERR_NETWORK') {
-      return 'Unable to connect to Sentinel server. Please verify Sentinel is running.';
+      return 'Unable to connect to Sentinel server. Please verify Sentinel backend is running and reachable.';
     }
     return error.message || 'An unexpected network error occurred.';
   }
