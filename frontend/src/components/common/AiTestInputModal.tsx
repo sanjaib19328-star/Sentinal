@@ -28,7 +28,14 @@ interface AiTestInputModalProps {
     fileName?: string;
     fileContentType?: string;
   }) => Promise<void>;
-  onContinueTest: (approveDestructive: boolean) => Promise<void>;
+  onContinueTest: (
+    approveDestructive: boolean,
+    selectedFile?: {
+      base64: string;
+      name: string;
+      type: string;
+    } | null
+  ) => Promise<void>;
   onCancelTest: () => Promise<void>;
   loading?: boolean;
   errorMessage?: string | null;
@@ -436,7 +443,7 @@ export const AiTestInputModal: React.FC<AiTestInputModalProps> = ({
               type="button"
               className="btn btn-primary btn-sm"
               disabled={loading}
-              onClick={() => onContinueTest(approveDestructive)}
+              onClick={() => onContinueTest(approveDestructive, selectedFile)}
               style={{ gap: '0.375rem' }}
             >
               <Play style={{ width: '0.875rem', height: '0.875rem' }} />

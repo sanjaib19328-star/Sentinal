@@ -233,10 +233,18 @@ export const AiAssistant: React.FC = () => {
       console.debug('Could not pre-fetch session', e);
     }
 
-    await executeFullTestSuite(true, convId || undefined);
+    await executeFullTestSuite(true, null, convId || undefined);
   };
 
-  const executeFullTestSuite = async (approveDestructive: boolean, targetConvId?: number) => {
+  const executeFullTestSuite = async (
+    approveDestructive: boolean,
+    fileOverride?: {
+      base64: string;
+      name: string;
+      type: string;
+    } | null,
+    targetConvId?: number
+  ) => {
     let convId = targetConvId || activeConversationId;
     if (!convId && selectedAppId) {
       try {
@@ -265,9 +273,18 @@ export const AiAssistant: React.FC = () => {
         applicationId: selectedAppId,
         apiKeyId: selectedKeyId || undefined,
         approveDestructiveOperations: approveDestructive,
-        fileBase64: attachedFile?.base64 || currentSession?.fileBase64,
-        fileName: attachedFile?.name || currentSession?.fileName,
-        fileContentType: attachedFile?.type || currentSession?.fileContentType,
+        fileBase64:
+          fileOverride?.base64 ||
+          attachedFile?.base64 ||
+          currentSession?.fileBase64,
+        fileName:
+          fileOverride?.name ||
+          attachedFile?.name ||
+          currentSession?.fileName,
+        fileContentType:
+          fileOverride?.type ||
+          attachedFile?.type ||
+          currentSession?.fileContentType,
       });
 
       await loadActiveConversation(convId);
@@ -870,7 +887,7 @@ export const AiAssistant: React.FC = () => {
         loading={runningTest}
         errorMessage={aiTestError}
         onProvideInput={handleProvideSessionInput}
-        onContinueTest={(approve) => executeFullTestSuite(approve)}
+        onContinueTest={(approve, file) => executeFullTestSuite(approve, file)}
         onCancelTest={handleCancelSessionTest}
       />
     </div>
