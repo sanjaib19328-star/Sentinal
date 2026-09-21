@@ -301,7 +301,22 @@ public class AiTestEngineService {
         ApiKey apiKey = resolveApiKey(applicationId, request.getApiKeyId());
         AiTestPlanDto plan = generateTestPlan(ownerId, applicationId);
 
-        Map<String, String> runtimeVariables = new HashMap<>(request.getInitialContext());
+        Map<String, String> runtimeVariables = new HashMap<>(request.getInitialContext() != null ? request.getInitialContext() : Collections.emptyMap());
+
+        // Check if an active session has the uploaded file if missing from direct request
+        if (request.getFileBase64() == null || request.getFileBase64().isBlank()) {
+            String sessionKey = ownerId + "_" + applicationId;
+            AiTestSessionDto activeSession = activeSessions.get(sessionKey);
+            if (activeSession != null && activeSession.getFileBase64() != null && !activeSession.getFileBase64().isBlank()) {
+                request.setFileBase64(activeSession.getFileBase64());
+                if (request.getFileName() == null || request.getFileName().isBlank()) {
+                    request.setFileName(activeSession.getFileName());
+                }
+                if (request.getFileContentType() == null || request.getFileContentType().isBlank()) {
+                    request.setFileContentType(activeSession.getFileContentType());
+                }
+            }
+        }
 
         // File Context: populated strictly from user-provided upload
         if (request.getFileBase64() != null && !request.getFileBase64().isBlank()) {
@@ -439,6 +454,12 @@ public class AiTestEngineService {
             if (step.isMultipart()) {
                 String fileBase64 = runtimeVariables.get("file_base64");
                 if (fileBase64 == null || fileBase64.isBlank()) {
+                    fileBase64 = request.getFileBase64();
+                    if (fileBase64 != null && !fileBase64.isBlank()) {
+                        runtimeVariables.put("file_base64", fileBase64);
+                    }
+                }
+                if (fileBase64 == null || fileBase64.isBlank()) {
                     String reason = "Multipart endpoint " + step.getMethod() + " " + step.getPath() + " requires an uploaded image/file. No image was provided.";
                     result.setBlocked(true);
                     result.setSkipped(true);
@@ -456,10 +477,20 @@ public class AiTestEngineService {
                 }
 
                 consoleReq.setBinaryBodyBase64(fileBase64);
-                consoleReq.setFileName(runtimeVariables.get("file_name"));
-                consoleReq.setFileContentType(runtimeVariables.get("file_content_type"));
-                consoleReq.setFileFieldName(step.getMultipartFieldName() != null ? step.getMultipartFieldName() : "file");
-                result.getInputsUsed().put("file", runtimeVariables.get("file_name"));
+                String fName = runtimeVariables.get("file_name");
+                if (fName == null || fName.isBlank()) fName = request.getFileName();
+                if (fName == null || fName.isBlank()) fName = "uploaded_image.png";
+                consoleReq.setFileName(fName);
+
+                String cType = runtimeVariables.get("file_content_type");
+                if (cType == null || cType.isBlank()) cType = request.getFileContentType();
+                if (cType == null || cType.isBlank()) cType = "image/png";
+                consoleReq.setFileContentType(cType);
+
+                String fieldName = step.getMultipartFieldName();
+                if (fieldName == null || fieldName.isBlank()) fieldName = "file";
+                consoleReq.setFileFieldName(fieldName);
+                result.getInputsUsed().put("file", fName);
             } else if (step.getMethod().equals("POST") || step.getMethod().equals("PUT") || step.getMethod().equals("PATCH")) {
                 if (step.getRequestBodyTemplate() != null) {
                     String body = step.getRequestBodyTemplate();

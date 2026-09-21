@@ -301,4 +301,136 @@ public class AiTestEngineServiceTest {
         assertEquals("READY", updatedSession.getStatus());
         assertTrue(updatedSession.getMissingInputs().isEmpty());
     }
+
+    @Test
+    void testMultipartUploadStepCreatesMultipartRequestWithDecodedBytes() {
+        when(apiEndpointRepository.findByApplicationId(995L)).thenReturn(createPixelVaultEndpoints());
+
+        List<ApiTestConsoleRequest> capturedRequests = new ArrayList<>();
+        when(apiTestConsoleService.executeTest(any(), eq(995L), any(ApiTestConsoleRequest.class)))
+            .thenAnswer(invocation -> {
+                ApiTestConsoleRequest req = invocation.getArgument(2);
+                capturedRequests.add(req);
+                ApiTestConsoleResultDto res = new ApiTestConsoleResultDto();
+                res.setStatusCode(200);
+                res.setLatencyMs(35);
+                res.setRequestId("req-mp-test");
+                if (req.getPath().equals("/api/v1/images/upload")) {
+                    res.setResponseBody("{\"image_id\": \"img_vault_123\"}");
+                } else {
+                    res.setResponseBody("{\"status\": \"ok\"}");
+                }
+                return res;
+            });
+
+        // Valid 1x1 PNG base64
+        String rawBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        String dataUrlBase64 = "data:image/png;base64," + rawBase64;
+
+        RunAiTestRequest request = new RunAiTestRequest();
+        request.setApplicationId(995L);
+        request.setApproveDestructiveOperations(true);
+        request.setFileBase64(dataUrlBase64);
+        request.setFileName("forensic_evidence.png");
+        request.setFileContentType("image/png");
+
+        AiTestRunReportDto report = aiTestEngineService.executeAiTestRun(1L, request);
+
+        assertNotNull(report);
+        assertEquals("PASSED", report.getOverallStatus());
+
+        // Find the captured request for /api/v1/images/upload
+        ApiTestConsoleRequest uploadReq = capturedRequests.stream()
+            .filter(r -> r.getPath().equals("/api/v1/images/upload"))
+            .findFirst()
+            .orElse(null);
+
+        assertNotNull(uploadReq, "Multipart upload request must be dispatched");
+        assertEquals("POST", uploadReq.getMethod());
+        assertEquals("file", uploadReq.getFileFieldName());
+        assertEquals("forensic_evidence.png", uploadReq.getFileName());
+        assertEquals("image/png", uploadReq.getFileContentType());
+        assertEquals(dataUrlBase64, uploadReq.getBinaryBodyBase64());
+
+        // Validate multipart binary body construction with decoded bytes
+        byte[] decodedBytes = java.util.Base64.getDecoder().decode(rawBase64);
+        String boundary = "----TestBoundary123456";
+        byte[] multipartPayload = ApiTestConsoleService.buildMultipartFormData(
+            decodedBytes,
+            uploadReq.getFileFieldName(),
+            uploadReq.getFileName(),
+            uploadReq.getFileContentType(),
+            boundary
+        );
+
+        String multipartString = new String(multipartPayload, java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(multipartString.contains("Content-Disposition: form-data; name=\"file\"; filename=\"forensic_evidence.png\""));
+        assertTrue(multipartString.contains("Content-Type: image/png"));
+        assertTrue(multipartString.contains(boundary));
+        assertTrue(multipartPayload.length > decodedBytes.length);
+
+        // Verify non-multipart step 0 (GET /) and step 1 (GET /api/v1/health) remained clean
+        ApiTestConsoleRequest rootReq = capturedRequests.stream()
+            .filter(r -> r.getPath().equals("/"))
+            .findFirst()
+            .orElse(null);
+        assertNotNull(rootReq);
+        assertEquals("GET", rootReq.getMethod());
+        assertTrue(rootReq.getBinaryBodyBase64() == null || rootReq.getBinaryBodyBase64().isBlank());
+
+        ApiTestConsoleRequest healthReq = capturedRequests.stream()
+            .filter(r -> r.getPath().equals("/api/v1/health"))
+            .findFirst()
+            .orElse(null);
+        assertNotNull(healthReq);
+        assertEquals("GET", healthReq.getMethod());
+        assertTrue(healthReq.getBinaryBodyBase64() == null || healthReq.getBinaryBodyBase64().isBlank());
+    }
+
+    @Test
+    void testMultipartFallbackFromActiveSessionWhenRequestFileBase64Empty() {
+        when(apiEndpointRepository.findByApplicationId(995L)).thenReturn(createPixelVaultEndpoints());
+
+        // Seed session with image
+        aiTestEngineService.provideSessionInput(
+            1L, 995L, "file_base64", "c2Vzc2lvbkJhc2U2NA==", "c2Vzc2lvbkJhc2U2NA==", "session_photo.png", "image/png"
+        );
+
+        List<ApiTestConsoleRequest> capturedRequests = new ArrayList<>();
+        when(apiTestConsoleService.executeTest(any(), eq(995L), any(ApiTestConsoleRequest.class)))
+            .thenAnswer(invocation -> {
+                ApiTestConsoleRequest req = invocation.getArgument(2);
+                capturedRequests.add(req);
+                ApiTestConsoleResultDto res = new ApiTestConsoleResultDto();
+                res.setStatusCode(200);
+                res.setLatencyMs(25);
+                res.setRequestId("req-session-test");
+                if (req.getPath().equals("/api/v1/images/upload")) {
+                    res.setResponseBody("{\"image_id\": \"img_from_session\"}");
+                } else {
+                    res.setResponseBody("{\"status\": \"ok\"}");
+                }
+                return res;
+            });
+
+        // Request with null file fields
+        RunAiTestRequest emptyReq = new RunAiTestRequest();
+        emptyReq.setApplicationId(995L);
+        emptyReq.setApproveDestructiveOperations(true);
+
+        AiTestRunReportDto report = aiTestEngineService.executeAiTestRun(1L, emptyReq);
+
+        assertNotNull(report);
+        assertEquals("PASSED", report.getOverallStatus());
+
+        ApiTestConsoleRequest uploadReq = capturedRequests.stream()
+            .filter(r -> r.getPath().equals("/api/v1/images/upload"))
+            .findFirst()
+            .orElse(null);
+
+        assertNotNull(uploadReq);
+        assertEquals("c2Vzc2lvbkJhc2U2NA==", uploadReq.getBinaryBodyBase64());
+        assertEquals("session_photo.png", uploadReq.getFileName());
+    }
 }
+

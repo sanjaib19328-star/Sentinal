@@ -189,13 +189,15 @@ public class ApiTestConsoleService {
                 .uri(preparedRequest.getTargetUri())
                 .timeout(timeout);
 
+            boolean isMultipartRequest = request.getBinaryBodyBase64() != null && !request.getBinaryBodyBase64().isBlank();
+
             // Copy safe headers from request
             if (request.getHeaders() != null) {
                 request.getHeaders().forEach((k, v) -> {
                     String lower = k.toLowerCase(Locale.ROOT);
                     if (!HOP_BY_HOP_HEADERS.contains(lower) && !lower.startsWith("x-sentinel-") && !lower.startsWith("x-internal-")) {
                         // If this is a multipart request with attached file, don't set raw Content-Type here; we will set the multipart boundary header below
-                        if (!"content-type".equals(lower) || request.getFileName() == null) {
+                        if (!"content-type".equals(lower) || !isMultipartRequest) {
                             httpRequestBuilder.header(k, v);
                         }
                     }
@@ -211,15 +213,25 @@ public class ApiTestConsoleService {
             httpRequestBuilder.header("X-Forwarded-For", "127.0.0.1");
 
             byte[] bodyBytes;
-            if (request.getBinaryBodyBase64() != null && !request.getBinaryBodyBase64().isBlank()) {
-                byte[] rawFileBytes = Base64.getDecoder().decode(request.getBinaryBodyBase64());
-                if (request.getFileName() != null || request.getFileFieldName() != null) {
-                    String boundary = "----SentinelBoundary" + UUID.randomUUID().toString().replace("-", "");
-                    bodyBytes = buildMultipartFormData(rawFileBytes, request.getFileFieldName(), request.getFileName(), request.getFileContentType(), boundary);
-                    httpRequestBuilder.header("Content-Type", "multipart/form-data; boundary=" + boundary);
-                } else {
-                    bodyBytes = rawFileBytes;
+            if (isMultipartRequest) {
+                String cleanBase64 = request.getBinaryBodyBase64();
+                int commaIdx = cleanBase64.indexOf(',');
+                if (commaIdx != -1 && cleanBase64.substring(0, commaIdx).contains(";base64")) {
+                    cleanBase64 = cleanBase64.substring(commaIdx + 1);
                 }
+                cleanBase64 = cleanBase64.trim().replaceAll("\\s+", "");
+                byte[] rawFileBytes = Base64.getDecoder().decode(cleanBase64);
+
+                String fieldName = (request.getFileFieldName() != null && !request.getFileFieldName().isBlank())
+                    ? request.getFileFieldName() : "file";
+                String fileName = (request.getFileName() != null && !request.getFileName().isBlank())
+                    ? request.getFileName() : "uploaded_image.png";
+                String contentType = (request.getFileContentType() != null && !request.getFileContentType().isBlank())
+                    ? request.getFileContentType() : "image/png";
+
+                String boundary = "----SentinelBoundary" + UUID.randomUUID().toString().replace("-", "");
+                bodyBytes = buildMultipartFormData(rawFileBytes, fieldName, fileName, contentType, boundary);
+                httpRequestBuilder.header("Content-Type", "multipart/form-data; boundary=" + boundary);
             } else if (request.getBody() != null && !request.getBody().isEmpty()) {
                 bodyBytes = request.getBody().getBytes(StandardCharsets.UTF_8);
             } else {
@@ -375,10 +387,10 @@ public class ApiTestConsoleService {
         return HOP_BY_HOP_HEADERS.contains(lower) || lower.startsWith("x-sentinel-");
     }
 
-    private byte[] buildMultipartFormData(byte[] fileBytes, String fieldName, String fileName, String contentType, String boundary) {
+    static byte[] buildMultipartFormData(byte[] fileBytes, String fieldName, String fileName, String contentType, String boundary) {
         String fName = (fieldName != null && !fieldName.isBlank()) ? fieldName.trim() : "file";
-        String file = (fileName != null && !fileName.isBlank()) ? fileName.trim() : "upload.bin";
-        String cType = (contentType != null && !contentType.isBlank()) ? contentType.trim() : "application/octet-stream";
+        String file = (fileName != null && !fileName.isBlank()) ? fileName.trim() : "uploaded_image.png";
+        String cType = (contentType != null && !contentType.isBlank()) ? contentType.trim() : "image/png";
 
         String header = "--" + boundary + "\r\n"
             + "Content-Disposition: form-data; name=\"" + fName + "\"; filename=\"" + file + "\"\r\n"
