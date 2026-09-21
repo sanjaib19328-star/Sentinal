@@ -46,6 +46,7 @@ export const AiAssistant: React.FC = () => {
   // Waitable AI Test Session State
   const [currentSession, setCurrentSession] = useState<AiTestSession | null>(null);
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  const [aiTestError, setAiTestError] = useState<string | null>(null);
 
   // Rename state
   const [editingChatId, setEditingChatId] = useState<number | null>(null);
@@ -201,7 +202,25 @@ export const AiAssistant: React.FC = () => {
   };
 
   const handleRunAiTestSuite = async () => {
-    if (!activeConversationId || !selectedAppId || runningTest) return;
+    if (!selectedAppId || runningTest) return;
+    setAiTestError(null);
+
+    // Auto-create active conversation if none exists
+    let convId = activeConversationId;
+    if (!convId) {
+      try {
+        const appName = applications.find((a) => a.id === selectedAppId)?.name || 'Suite';
+        const newConv = await conversationsApi.create({
+          applicationId: selectedAppId,
+          title: `AI Test: ${appName}`,
+        });
+        convId = newConv.id;
+        setActiveConversationId(newConv.id);
+        await loadConversations();
+      } catch (err) {
+        console.error('Failed to create conversation for AI test', err);
+      }
+    }
 
     try {
       const session = await conversationsApi.getAiTestSession(selectedAppId);
@@ -214,14 +233,35 @@ export const AiAssistant: React.FC = () => {
       console.debug('Could not pre-fetch session', e);
     }
 
-    await executeFullTestSuite(true);
+    await executeFullTestSuite(true, convId || undefined);
   };
 
-  const executeFullTestSuite = async (approveDestructive: boolean) => {
-    if (!activeConversationId || !selectedAppId) return;
+  const executeFullTestSuite = async (approveDestructive: boolean, targetConvId?: number) => {
+    let convId = targetConvId || activeConversationId;
+    if (!convId && selectedAppId) {
+      try {
+        const appName = applications.find((a) => a.id === selectedAppId)?.name || 'Suite';
+        const newConv = await conversationsApi.create({
+          applicationId: selectedAppId,
+          title: `AI Test: ${appName}`,
+        });
+        convId = newConv.id;
+        setActiveConversationId(newConv.id);
+        await loadConversations();
+      } catch (err) {
+        console.error('Failed to create conversation for AI test', err);
+      }
+    }
+
+    if (!convId || !selectedAppId) {
+      setAiTestError('Please select or create an active chat before executing tests.');
+      return;
+    }
+
     setRunningTest(true);
+    setAiTestError(null);
     try {
-      await conversationsApi.runAiTestForConversation(activeConversationId, {
+      await conversationsApi.runAiTestForConversation(convId, {
         applicationId: selectedAppId,
         apiKeyId: selectedKeyId || undefined,
         approveDestructiveOperations: approveDestructive,
@@ -230,12 +270,15 @@ export const AiAssistant: React.FC = () => {
         fileContentType: attachedFile?.type || currentSession?.fileContentType,
       });
 
-      await loadActiveConversation(activeConversationId);
+      await loadActiveConversation(convId);
       setAttachedFile(null);
       setSessionModalOpen(false);
+      setCurrentSession(null);
       loadConversations();
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to run AI test suite', e);
+      const msg = e.response?.data?.message || e.response?.data?.error || e.message || 'AI Test Execution failed';
+      setAiTestError(msg);
     } finally {
       setRunningTest(false);
     }
@@ -708,6 +751,29 @@ export const AiAssistant: React.FC = () => {
             </div>
           )}
 
+          {aiTestError && (
+            <div className="ai-message-bubble assistant">
+              <div
+                className="ai-message-content"
+                style={{
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: 'var(--radius-md)',
+                  color: '#b91c1c',
+                  padding: '0.875rem 1rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                  <AlertTriangle style={{ width: '1.125rem', height: '1.125rem', flexShrink: 0 }} />
+                  <span>AI Test Suite Execution Error</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.8125rem', opacity: 0.95 }}>
+                  {aiTestError}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
 
@@ -802,8 +868,9 @@ export const AiAssistant: React.FC = () => {
         session={currentSession}
         apiKeys={apiKeys}
         loading={runningTest}
+        errorMessage={aiTestError}
         onProvideInput={handleProvideSessionInput}
-        onContinueTest={executeFullTestSuite}
+        onContinueTest={(approve) => executeFullTestSuite(approve)}
         onCancelTest={handleCancelSessionTest}
       />
     </div>

@@ -9,6 +9,9 @@ import {
   Key,
   CheckCircle2,
   Trash2,
+  Minus,
+  Maximize2,
+  AlertCircle,
 } from 'lucide-react';
 import { AiTestSession } from '../../types/conversation';
 import { ApiKey } from '../../types/apiKey';
@@ -28,6 +31,7 @@ interface AiTestInputModalProps {
   onContinueTest: (approveDestructive: boolean) => Promise<void>;
   onCancelTest: () => Promise<void>;
   loading?: boolean;
+  errorMessage?: string | null;
 }
 
 export const AiTestInputModal: React.FC<AiTestInputModalProps> = ({
@@ -39,6 +43,7 @@ export const AiTestInputModal: React.FC<AiTestInputModalProps> = ({
   onContinueTest,
   onCancelTest,
   loading = false,
+  errorMessage = null,
 }) => {
   const [selectedFile, setSelectedFile] = useState<{
     base64: string;
@@ -49,6 +54,7 @@ export const AiTestInputModal: React.FC<AiTestInputModalProps> = ({
 
   const [customKey, setCustomKey] = useState('');
   const [approveDestructive, setApproveDestructive] = useState(true);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   if (!isOpen || !session) return null;
 
@@ -89,6 +95,83 @@ export const AiTestInputModal: React.FC<AiTestInputModalProps> = ({
 
   const missingInputs = session.missingInputs || [];
   const isReady = missingInputs.length === 0;
+
+  // Minimized floating card at bottom right
+  if (isMinimized) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '1.5rem',
+          right: '1.5rem',
+          zIndex: 100,
+          backgroundColor: '#ffffff',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+          border: '1px solid var(--border-color)',
+          padding: '0.875rem 1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          maxWidth: '420px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+          <div
+            style={{
+              width: '2rem',
+              height: '2rem',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: loading ? '#fef3c7' : '#eff6ff',
+              color: loading ? '#d97706' : 'var(--primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {loading ? (
+              <div className="status-dot status-dot-healthy animate-spin" style={{ width: '0.75rem', height: '0.75rem' }} />
+            ) : (
+              <Sparkles style={{ width: '1.125rem', height: '1.125rem' }} />
+            )}
+          </div>
+          <div>
+            <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+              <span>AI Test Engine</span>
+              <span
+                className={`pill-badge ${loading ? 'pill-badge-amber' : isReady ? 'pill-badge-green' : 'pill-badge-blue'}`}
+                style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem' }}
+              >
+                {loading ? 'Running Tests...' : isReady ? 'Ready' : 'Input Needed'}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {session.applicationName}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginLeft: 'auto' }}>
+          <button
+            onClick={() => setIsMinimized(false)}
+            className="btn btn-ghost btn-sm"
+            style={{ padding: '0.35rem', color: 'var(--text-secondary)' }}
+            title="Maximize AI Test Engine modal"
+          >
+            <Maximize2 style={{ width: '1rem', height: '1rem' }} />
+          </button>
+          <button
+            onClick={onClose}
+            className="btn btn-ghost btn-sm"
+            style={{ padding: '0.35rem', color: 'var(--text-muted)' }}
+            title="Close popup (Session preserved)"
+          >
+            <X style={{ width: '1rem', height: '1rem' }} />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -147,15 +230,46 @@ export const AiTestInputModal: React.FC<AiTestInputModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="btn btn-ghost btn-sm"
-            style={{ padding: '0.25rem', color: 'var(--text-muted)' }}
-            title="Close popup (Session will be preserved)"
-          >
-            <X style={{ width: '1.125rem', height: '1.125rem' }} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <button
+              onClick={() => setIsMinimized(true)}
+              className="btn btn-ghost btn-sm"
+              style={{ padding: '0.25rem', color: 'var(--text-muted)' }}
+              title="Minimize to floating widget"
+            >
+              <Minus style={{ width: '1.125rem', height: '1.125rem' }} />
+            </button>
+            <button
+              onClick={onClose}
+              className="btn btn-ghost btn-sm"
+              style={{ padding: '0.25rem', color: 'var(--text-muted)' }}
+              title="Close popup (Session will be preserved)"
+            >
+              <X style={{ width: '1.125rem', height: '1.125rem' }} />
+            </button>
+          </div>
         </div>
+
+        {/* Error Banner */}
+        {errorMessage && (
+          <div
+            style={{
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.75rem 1rem',
+              marginBottom: '1rem',
+              fontSize: '0.8125rem',
+              color: '#b91c1c',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <AlertCircle style={{ width: '1.125rem', height: '1.125rem', flexShrink: 0 }} />
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
         {/* Status Callout */}
         <div
