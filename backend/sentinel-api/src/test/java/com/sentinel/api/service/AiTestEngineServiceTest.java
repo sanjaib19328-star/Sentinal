@@ -155,6 +155,9 @@ public class AiTestEngineServiceTest {
         RunAiTestRequest request = new RunAiTestRequest();
         request.setApplicationId(995L);
         request.setApproveDestructiveOperations(true); // Approve clean
+        request.setFileBase64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
+        request.setFileName("test_upload.png");
+        request.setFileContentType("image/png");
 
         AiTestRunReportDto report = aiTestEngineService.executeAiTestRun(1L, request);
 
@@ -199,6 +202,9 @@ public class AiTestEngineServiceTest {
         RunAiTestRequest request = new RunAiTestRequest();
         request.setApplicationId(995L);
         request.setApproveDestructiveOperations(true);
+        request.setFileBase64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
+        request.setFileName("test_upload.png");
+        request.setFileContentType("image/png");
 
         AiTestRunReportDto report = aiTestEngineService.executeAiTestRun(1L, request);
 
@@ -245,6 +251,9 @@ public class AiTestEngineServiceTest {
         RunAiTestRequest request = new RunAiTestRequest();
         request.setApplicationId(995L);
         request.setApproveDestructiveOperations(true);
+        request.setFileBase64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
+        request.setFileName("test_upload.png");
+        request.setFileContentType("image/png");
 
         AiTestRunReportDto report = aiTestEngineService.executeAiTestRun(1L, request);
 
@@ -252,6 +261,26 @@ public class AiTestEngineServiceTest {
         assertEquals(2, report.getPassedSteps()); // Root and Health
         assertEquals(1, report.getFailedSteps()); // Upload failed
         assertEquals(4, report.getBlockedSteps()); // Analyze, Clean, Download, Report blocked
+    }
+
+    @Test
+    void testMultipartStepWithoutFileIsBlockedWithoutFallback() {
+        when(apiEndpointRepository.findByApplicationId(995L)).thenReturn(createPixelVaultEndpoints());
+
+        // Do NOT provide fileBase64 in request
+        RunAiTestRequest request = new RunAiTestRequest();
+        request.setApplicationId(995L);
+        request.setApproveDestructiveOperations(true);
+
+        AiTestRunReportDto report = aiTestEngineService.executeAiTestRun(1L, request);
+
+        assertNotNull(report);
+        // Step 2 is POST /api/v1/images/upload (multipart) -> must be BLOCKED because no image was provided
+        AiTestStepResultDto uploadResult = report.getStepResults().get(2);
+        assertTrue(uploadResult.isBlocked(), "Multipart step must be blocked when no image is provided");
+        assertEquals("BLOCKED", uploadResult.getExecutionStatus());
+        assertEquals(422, uploadResult.getStatus());
+        assertTrue(uploadResult.getBlockedReason().contains("requires an uploaded image/file"));
     }
 
     @Test

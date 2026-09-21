@@ -176,7 +176,7 @@ export const AiAssistant: React.FC = () => {
     if (e) e.preventDefault();
     if ((!prompt.trim() && !attachedFile) || !activeConversationId || sending) return;
 
-    const userText = prompt.trim() || `Uploaded file: ${attachedFile?.name}`;
+    const userText = prompt.trim() || (attachedFile ? 'Please analyze this image.' : '');
     setSending(true);
     setPrompt('');
 
@@ -191,6 +191,7 @@ export const AiAssistant: React.FC = () => {
 
       setActiveConversation(updated);
       setAttachedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       loadConversations();
     } catch (e) {
       console.error('Failed to send message', e);
@@ -313,6 +314,22 @@ export const AiAssistant: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Selected image exceeds the maximum allowed size of 10MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // Validate MIME type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif', 'image/bmp'];
+    const mime = file.type?.toLowerCase() || '';
+    if (!allowedTypes.includes(mime) && !file.type.startsWith('image/')) {
+      alert('Unsupported file type. Please upload a PNG, JPEG, WEBP, GIF, or BMP image.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
@@ -321,7 +338,7 @@ export const AiAssistant: React.FC = () => {
         base64,
         name: file.name,
         size: file.size,
-        type: file.type || 'application/octet-stream',
+        type: file.type || 'image/png',
       });
     };
     reader.readAsDataURL(file);
@@ -639,18 +656,45 @@ export const AiAssistant: React.FC = () => {
               </div>
             </div>
           ) : (
-            activeConversation.messages.map((msg) => (
-              <div key={msg.id} className={`ai-message-bubble ${msg.sender.toLowerCase()}`}>
-                <div className="ai-message-content">
-                  {msg.sender === 'USER' ? (
-                    <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
-                  ) : (
-                    <MarkdownViewer content={msg.content} />
-                  )}
-                  {renderStructuredReport(msg.metadataJson)}
+            activeConversation.messages.map((msg) => {
+              let fileMeta: { hasImage?: boolean; fileName?: string; contentType?: string; sizeBytes?: number; width?: number; height?: number } | null = null;
+              if (msg.metadataJson) {
+                try {
+                  const parsed = JSON.parse(msg.metadataJson);
+                  if (parsed.file) {
+                    fileMeta = parsed.file;
+                  }
+                } catch (_) {}
+              }
+
+              return (
+                <div key={msg.id} className={`ai-message-bubble ${msg.sender.toLowerCase()}`}>
+                  <div className="ai-message-content">
+                    {fileMeta && fileMeta.hasImage && (
+                      <div className="console-file-chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.8125rem' }}>
+                        <FileCode style={{ width: '1rem', height: '1rem', color: 'var(--primary)' }} />
+                        <span style={{ fontWeight: 600 }}>{fileMeta.fileName}</span>
+                        {fileMeta.width && fileMeta.height ? (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                            ({fileMeta.width}×{fileMeta.height} px • {((fileMeta.sizeBytes || 0) / 1024).toFixed(1)} KB)
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                            ({((fileMeta.sizeBytes || 0) / 1024).toFixed(1)} KB)
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {msg.sender === 'USER' ? (
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                    ) : (
+                      <MarkdownViewer content={msg.content} />
+                    )}
+                    {renderStructuredReport(msg.metadataJson)}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
 
           {(sending || runningTest) && (
@@ -671,9 +715,13 @@ export const AiAssistant: React.FC = () => {
         <div className="ai-chat-input-area">
           {attachedFile && (
             <div style={{ marginBottom: '0.5rem' }}>
-              <div className="console-file-chip">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <FileCode style={{ width: '1rem', height: '1rem', color: 'var(--primary)' }} />
+              <div className="console-file-chip" style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '0.375rem 0.625rem' }}>
+                <img
+                  src={`data:${attachedFile.type};base64,${attachedFile.base64}`}
+                  alt="preview"
+                  style={{ width: '28px', height: '28px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border-color)' }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flex: 1 }}>
                   <span style={{ fontWeight: 600 }}>{attachedFile.name}</span>
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                     ({(attachedFile.size / 1024).toFixed(1)} KB)
@@ -683,7 +731,10 @@ export const AiAssistant: React.FC = () => {
                   type="button"
                   className="btn btn-ghost btn-sm"
                   style={{ padding: '0.15rem', color: '#ef4444' }}
-                  onClick={() => setAttachedFile(null)}
+                  onClick={() => {
+                    setAttachedFile(null);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
                 >
                   <X style={{ width: '0.875rem', height: '0.875rem' }} />
                 </button>
@@ -695,13 +746,14 @@ export const AiAssistant: React.FC = () => {
             <input
               type="file"
               ref={fileInputRef}
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,image/bmp"
               style={{ display: 'none' }}
               onChange={handleFileChange}
             />
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              title="Attach File/Image for AI Testing"
+              title="Attach Image for AI Vision Analysis"
               onClick={() => fileInputRef.current?.click()}
               style={{ padding: '0.625rem 0.75rem' }}
             >
@@ -711,7 +763,7 @@ export const AiAssistant: React.FC = () => {
             <input
               type="text"
               className="form-input"
-              placeholder="Ask Sentinel AI to test APIs, upload files, or analyze failures..."
+              placeholder="Ask Sentinel AI to test APIs, analyze images, or diagnose health..."
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               disabled={sending || runningTest}

@@ -270,7 +270,7 @@ export const AiTestInputModal: React.FC<AiTestInputModalProps> = ({
               {(selectedFile || session.fileBase64) && (
                 <div className="console-file-chip" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>
                   <FileCode style={{ width: '0.875rem', height: '0.875rem', color: 'var(--primary)' }} />
-                  <span>{selectedFile?.name || session.fileName || 'sentinel_test_image.png'}</span>
+                  <span>{selectedFile?.name || session.fileName || 'No file selected'}</span>
                 </div>
               )}
               {apiKeys.length > 0 && (

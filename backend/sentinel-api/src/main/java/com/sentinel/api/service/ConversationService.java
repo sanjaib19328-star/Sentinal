@@ -43,6 +43,23 @@ public class ConversationService {
     private final ApplicationRepository applicationRepository;
     private final AiTestEngineService aiTestEngineService;
     private final GeminiService geminiService;
+    private final ImageProcessingService imageProcessingService;
+
+    public ConversationService(
+        ConversationRepository conversationRepository,
+        ConversationMessageRepository messageRepository,
+        ApplicationRepository applicationRepository,
+        AiTestEngineService aiTestEngineService,
+        GeminiService geminiService,
+        ImageProcessingService imageProcessingService
+    ) {
+        this.conversationRepository = conversationRepository;
+        this.messageRepository = messageRepository;
+        this.applicationRepository = applicationRepository;
+        this.aiTestEngineService = aiTestEngineService;
+        this.geminiService = geminiService;
+        this.imageProcessingService = imageProcessingService;
+    }
 
     public ConversationService(
         ConversationRepository conversationRepository,
@@ -51,11 +68,7 @@ public class ConversationService {
         AiTestEngineService aiTestEngineService,
         GeminiService geminiService
     ) {
-        this.conversationRepository = conversationRepository;
-        this.messageRepository = messageRepository;
-        this.applicationRepository = applicationRepository;
-        this.aiTestEngineService = aiTestEngineService;
-        this.geminiService = geminiService;
+        this(conversationRepository, messageRepository, applicationRepository, aiTestEngineService, geminiService, new ImageProcessingService());
     }
 
     @Transactional
@@ -191,16 +204,48 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findByIdAndUserId(conversationId, userId)
             .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
+        if (!request.hasContent() && !request.hasImage()) {
+            throw new IllegalArgumentException("Message content or image attachment is required.");
+        }
+
+        String effectiveUserText = request.getEffectiveContent();
+        String userMetadataJson = sanitizeMetadata(request.getMetadataJson());
+
+        // Validate and process image if present
+        if (request.hasImage()) {
+            byte[] imageBytes = imageProcessingService.validateAndDecodeImage(request.getFileBase64(), request.getFileContentType());
+            ImageProcessingService.ImageMetadata imageMeta = imageProcessingService.inspectImage(
+                request.getFileName(), request.getFileContentType(), imageBytes
+            );
+
+            // Construct lightweight metadata for conversation persistence (no large base64 blobs in DB)
+            try {
+                com.fasterxml.jackson.databind.node.ObjectNode metaNode = userMetadataJson != null
+                    ? (com.fasterxml.jackson.databind.node.ObjectNode) MAPPER.readTree(userMetadataJson)
+                    : MAPPER.createObjectNode();
+                com.fasterxml.jackson.databind.node.ObjectNode fileNode = metaNode.putObject("file");
+                fileNode.put("hasImage", true);
+                fileNode.put("fileName", imageMeta.fileName());
+                fileNode.put("contentType", imageMeta.contentType());
+                fileNode.put("sizeBytes", imageMeta.sizeBytes());
+                fileNode.put("width", imageMeta.width());
+                fileNode.put("height", imageMeta.height());
+                userMetadataJson = MAPPER.writeValueAsString(metaNode);
+            } catch (Exception e) {
+                log.warn("Failed to serialize image metadata: {}", e.getMessage());
+            }
+        }
+
         // Save User Message
         ConversationMessage userMsg = new ConversationMessage(
             conversation,
             MessageSender.USER,
-            request.getContent(),
-            sanitizeMetadata(request.getMetadataJson())
+            effectiveUserText,
+            userMetadataJson
         );
         messageRepository.save(userMsg);
 
-        String userPrompt = request.getContent().toLowerCase();
+        String userPrompt = effectiveUserText.toLowerCase();
         boolean isAiTestTrigger = request.isTriggerAiTesting() ||
             userPrompt.contains("test all apis") ||
             userPrompt.contains("run tests") ||
@@ -215,7 +260,7 @@ public class ConversationService {
             testReq.setFileBase64(request.getFileBase64());
             testReq.setFileName(request.getFileName());
             testReq.setFileContentType(request.getFileContentType());
-            testReq.setFocusPrompt(request.getContent());
+            testReq.setFocusPrompt(effectiveUserText);
 
             AiTestRunReportDto report = aiTestEngineService.executeAiTestRun(userId, testReq);
 
@@ -235,13 +280,15 @@ public class ConversationService {
             );
             messageRepository.save(aiMsg);
         } else {
-            // Contextual Gemini AI Assistant Response with live tools
+            // Contextual Gemini AI Assistant Response with live tools & multimodal vision
             List<ConversationMessage> history = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId());
             String aiResponseText = geminiService.generateResponse(
                 userId,
                 conversation.getApplicationId(),
                 history,
-                request.getContent()
+                effectiveUserText,
+                request.getFileBase64(),
+                request.getFileContentType()
             );
             ConversationMessage aiMsg = new ConversationMessage(
                 conversation,
@@ -254,7 +301,7 @@ public class ConversationService {
 
         // Auto-update default title if needed
         if (conversation.getTitle().equals("New Chat") || conversation.getTitle().equals("New AI Session")) {
-            conversation.setTitle(autoGenerateTitle(request.getContent(), null));
+            conversation.setTitle(autoGenerateTitle(effectiveUserText, null));
             conversationRepository.save(conversation);
         }
 

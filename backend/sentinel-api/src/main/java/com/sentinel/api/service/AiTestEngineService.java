@@ -50,9 +50,6 @@ public class AiTestEngineService {
         .build();
     private static final Pattern PATH_VAR_PATTERN = Pattern.compile("\\{([a-zA-Z0-9_-]+)\\}");
 
-    // Standard 1x1 transparent PNG fallback if test image is provided or needed
-    private static final String DEFAULT_TEST_IMAGE_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
-
     private final ApplicationRepository applicationRepository;
     private final ApiKeyRepository apiKeyRepository;
     private final ApiEndpointRepository apiEndpointRepository;
@@ -306,16 +303,11 @@ public class AiTestEngineService {
 
         Map<String, String> runtimeVariables = new HashMap<>(request.getInitialContext());
 
-        // File Context
+        // File Context: populated strictly from user-provided upload
         if (request.getFileBase64() != null && !request.getFileBase64().isBlank()) {
             runtimeVariables.put("file_base64", request.getFileBase64());
-            runtimeVariables.put("file_name", request.getFileName() != null ? request.getFileName() : "sentinel_test_image.png");
-            runtimeVariables.put("file_content_type", request.getFileContentType() != null ? request.getFileContentType() : "image/png");
-        } else if (!runtimeVariables.containsKey("file_base64")) {
-            // Default sample image if user didn't attach a specific file
-            runtimeVariables.put("file_base64", DEFAULT_TEST_IMAGE_PNG);
-            runtimeVariables.put("file_name", "sentinel_test_image.png");
-            runtimeVariables.put("file_content_type", "image/png");
+            runtimeVariables.put("file_name", request.getFileName() != null ? ImageProcessingService.sanitizeFileName(request.getFileName()) : "uploaded_image.png");
+            runtimeVariables.put("file_content_type", request.getFileContentType() != null ? ImageProcessingService.normalizeMimeType(request.getFileContentType()) : "image/png");
         }
 
         long runStartTime = System.currentTimeMillis();
@@ -445,7 +437,25 @@ public class AiTestEngineService {
             consoleReq.setPath(resolvedPath);
 
             if (step.isMultipart()) {
-                consoleReq.setBinaryBodyBase64(runtimeVariables.get("file_base64"));
+                String fileBase64 = runtimeVariables.get("file_base64");
+                if (fileBase64 == null || fileBase64.isBlank()) {
+                    String reason = "Multipart endpoint " + step.getMethod() + " " + step.getPath() + " requires an uploaded image/file. No image was provided.";
+                    result.setBlocked(true);
+                    result.setSkipped(true);
+                    result.setPassed(false);
+                    result.setStatus(422);
+                    result.setExecutionStatus("BLOCKED");
+                    result.setBlockedReason(reason);
+                    result.setError("Missing file: " + reason);
+                    result.setResponseSummary("Could not execute step because multipart image/file was not uploaded by user.");
+                    blockedCount++;
+                    stepSuccess.put(step.getStepId(), false);
+                    stepErrors.put(step.getStepId(), reason);
+                    results.add(result);
+                    continue;
+                }
+
+                consoleReq.setBinaryBodyBase64(fileBase64);
                 consoleReq.setFileName(runtimeVariables.get("file_name"));
                 consoleReq.setFileContentType(runtimeVariables.get("file_content_type"));
                 consoleReq.setFileFieldName(step.getMultipartFieldName() != null ? step.getMultipartFieldName() : "file");
@@ -590,8 +600,8 @@ public class AiTestEngineService {
 
         if (fileBase64 != null && !fileBase64.isBlank()) {
             session.setFileBase64(fileBase64);
-            session.setFileName(fileName != null ? fileName : "sentinel_test_image.png");
-            session.setFileContentType(fileContentType != null ? fileContentType : "image/png");
+            session.setFileName(fileName != null ? ImageProcessingService.sanitizeFileName(fileName) : "uploaded_image.png");
+            session.setFileContentType(fileContentType != null ? ImageProcessingService.normalizeMimeType(fileContentType) : "image/png");
             session.getProvidedInputs().put("file_base64", fileBase64);
             session.getProvidedInputs().put("file_name", session.getFileName());
         }

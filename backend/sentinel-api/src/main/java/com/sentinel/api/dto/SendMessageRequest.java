@@ -1,10 +1,7 @@
 package com.sentinel.api.dto;
 
-import jakarta.validation.constraints.NotBlank;
-
 public class SendMessageRequest {
 
-    @NotBlank(message = "Message content is required")
     private String content;
 
     private Long apiKeyId;
@@ -13,12 +10,30 @@ public class SendMessageRequest {
 
     private boolean triggerAiTesting;
 
-    // Optional uploaded file base64 data for AI test input memory
+    // Uploaded file base64 data for multimodal vision and AI test input memory
     private String fileBase64;
     private String fileName;
     private String fileContentType;
 
     public SendMessageRequest() {}
+
+    public boolean hasImage() {
+        return fileBase64 != null && !fileBase64.isBlank();
+    }
+
+    public boolean hasContent() {
+        return content != null && !content.isBlank();
+    }
+
+    public String getEffectiveContent() {
+        if (hasContent()) {
+            return content.trim();
+        }
+        if (hasImage()) {
+            return "Please analyze this image.";
+        }
+        return "";
+    }
 
     public String getContent() {
         return content;

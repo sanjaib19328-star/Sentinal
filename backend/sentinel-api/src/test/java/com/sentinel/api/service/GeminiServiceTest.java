@@ -14,6 +14,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -232,5 +233,98 @@ class GeminiServiceTest {
         assertNotNull(result);
         assertTrue(result.contains("Discovered API Catalog"));
         assertTrue(result.contains("/api/v1/auth/login"));
+    }
+
+    @Test
+    void testBuildContentsArrayForwardsExactUploadedBase64Image() throws Exception {
+        Method buildContentsMethod = GeminiService.class.getDeclaredMethod(
+            "buildContentsArray",
+            com.fasterxml.jackson.databind.node.ArrayNode.class,
+            List.class,
+            String.class,
+            String.class,
+            String.class
+        );
+        buildContentsMethod.setAccessible(true);
+
+        Conversation conv = new Conversation(10L, 1L, "Chat", null);
+        List<ConversationMessage> history = new ArrayList<>();
+        history.add(new ConversationMessage(conv, MessageSender.USER, "prior question", null));
+        history.add(new ConversationMessage(conv, MessageSender.ASSISTANT, "prior answer", null));
+
+        String customUserImageBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M9QzwAEjAwMDAwAFAAC/0wJv8gAAAAASUVORK5CYII=";
+        String fallbackBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+        com.fasterxml.jackson.databind.node.ArrayNode contents = mapper.createArrayNode();
+        buildContentsMethod.invoke(
+            geminiService,
+            contents,
+            history,
+            "What is in this image?",
+            customUserImageBase64,
+            "image/png"
+        );
+
+        // Verify history turns remain text-only
+        assertEquals(3, contents.size()); // turn 0: user text, turn 1: model text, turn 2: user text + image
+        assertEquals("user", contents.get(0).path("role").asText());
+        assertFalse(contents.get(0).path("parts").get(0).has("inlineData"), "History turn must not have inlineData");
+
+        assertEquals("model", contents.get(1).path("role").asText());
+        assertFalse(contents.get(1).path("parts").get(0).has("inlineData"), "Model history turn must not have inlineData");
+
+        // Current turn MUST contain inlineData with EXACT user Base64
+        JsonNode currentTurn = contents.get(2);
+        assertEquals("user", currentTurn.path("role").asText());
+        JsonNode parts = currentTurn.path("parts");
+        assertEquals(2, parts.size()); // part 0: inlineData, part 1: text
+
+        JsonNode inlineData = parts.get(0).path("inlineData");
+        assertTrue(inlineData.has("mimeType"));
+        assertEquals("image/png", inlineData.path("mimeType").asText());
+
+        assertTrue(inlineData.has("data"));
+        String actualData = inlineData.path("data").asText();
+
+        // Exact assertion: must equal uploaded base64, and NOT the fallback 1x1 image
+        assertEquals(customUserImageBase64, actualData);
+        assertNotEquals(fallbackBase64, actualData, "Gemini request must never substitute with fallback image");
+
+        // Verify prompt
+        assertEquals("What is in this image?", parts.get(1).path("text").asText());
+    }
+
+    @Test
+    void testBuildContentsArrayTextOnlyHasNoInlineData() throws Exception {
+        Method buildContentsMethod = GeminiService.class.getDeclaredMethod(
+            "buildContentsArray",
+            com.fasterxml.jackson.databind.node.ArrayNode.class,
+            List.class,
+            String.class,
+            String.class,
+            String.class
+        );
+        buildContentsMethod.setAccessible(true);
+
+        com.fasterxml.jackson.databind.node.ArrayNode contents = mapper.createArrayNode();
+        buildContentsMethod.invoke(geminiService, contents, Collections.emptyList(), "show health", null, null);
+
+        assertEquals(1, contents.size());
+        JsonNode parts = contents.get(0).path("parts");
+        assertEquals(1, parts.size());
+        assertTrue(parts.get(0).has("text"));
+        assertFalse(parts.get(0).has("inlineData"), "Text-only request must not attach inlineData");
+    }
+
+    @Test
+    void testOfflineImageResponseInspectsRealUploadedPayload() {
+        String testImageBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M9QzwAEjAwMDAwAFAAC/0wJv8gAAAAASUVORK5CYII=";
+        String response = geminiService.generateOfflineImageResponse("inspect this test image", testImageBase64, "image/png");
+
+        assertNotNull(response);
+        assertTrue(response.contains("VALID_IMAGE_PAYLOAD_RECEIVED"));
+        assertTrue(response.contains("image/png"));
+        assertTrue(response.contains("2 × 2 px") || response.contains("Dimensions:"));
+        assertTrue(response.contains("inspect this test image"));
     }
 }
