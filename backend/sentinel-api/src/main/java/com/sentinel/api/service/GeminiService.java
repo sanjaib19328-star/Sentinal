@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class GeminiService {
@@ -42,6 +43,7 @@ public class GeminiService {
     private final ToolExecutionService toolExecutionService;
     private final ImageProcessingService imageProcessingService;
 
+    @Autowired
     public GeminiService(ToolExecutionService toolExecutionService, ImageProcessingService imageProcessingService) {
         this.toolExecutionService = toolExecutionService;
         this.imageProcessingService = imageProcessingService;

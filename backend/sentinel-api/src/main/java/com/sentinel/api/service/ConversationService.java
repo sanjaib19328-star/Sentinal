@@ -20,6 +20,7 @@ import com.sentinel.api.repository.ConversationMessageRepository;
 import com.sentinel.api.repository.ConversationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,7 @@ public class ConversationService {
     private final GeminiService geminiService;
     private final ImageProcessingService imageProcessingService;
 
+    @Autowired
     public ConversationService(
         ConversationRepository conversationRepository,
         ConversationMessageRepository messageRepository,
