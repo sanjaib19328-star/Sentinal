@@ -16,7 +16,7 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react';
-import { conversationsApi } from '../api/conversations';
+import { conversationsApi, buildSendMessagePayload } from '../api/conversations';
 import { applicationsApi } from '../api/applications';
 import { apiKeysApi } from '../api/apiKeys';
 import { Conversation, ConversationDetail, AiTestRunReport, AiTestSession } from '../types/conversation';
@@ -26,6 +26,7 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { MarkdownViewer } from '../components/common/MarkdownViewer';
 import { AiTestInputModal } from '../components/common/AiTestInputModal';
+import { processImageFile } from '../utils/imageCompressor';
 
 export const AiAssistant: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -175,23 +176,28 @@ export const AiAssistant: React.FC = () => {
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if ((!prompt.trim() && !attachedFile) || !activeConversationId || sending) return;
+    const effectiveFile = attachedFile || (currentSession?.fileBase64 ? {
+      base64: currentSession.fileBase64,
+      name: currentSession.fileName || 'uploaded_image.png',
+      size: Math.round((currentSession.fileBase64.length * 3) / 4),
+      type: currentSession.fileContentType || 'image/png',
+    } : null);
 
-    const userText = prompt.trim() || (attachedFile ? 'Please analyze this image.' : '');
+    if ((!prompt.trim() && !effectiveFile) || !activeConversationId || sending) return;
+
+    const userText = prompt.trim() || (effectiveFile ? 'Please analyze this image.' : '');
     setSending(true);
     setPrompt('');
 
     try {
-      const updated = await conversationsApi.sendMessage(activeConversationId, {
-        content: userText,
-        apiKeyId: selectedKeyId,
-        fileBase64: attachedFile?.base64,
-        fileName: attachedFile?.name,
-        fileContentType: attachedFile?.type,
-      });
+      const messagePayload = buildSendMessagePayload(userText, selectedKeyId, effectiveFile);
+      const updated = await conversationsApi.sendMessage(activeConversationId, messagePayload);
 
       setActiveConversation(updated);
       setAttachedFile(null);
+      if (currentSession?.fileBase64) {
+        setCurrentSession((prev) => prev ? { ...prev, fileBase64: undefined, fileName: undefined, fileContentType: undefined } : null);
+      }
       if (fileInputRef.current) fileInputRef.current.value = '';
       loadConversations();
     } catch (e) {
@@ -224,10 +230,21 @@ export const AiAssistant: React.FC = () => {
 
     try {
       const session = await conversationsApi.getAiTestSession(selectedAppId);
-      if (session && session.missingInputs && session.missingInputs.length > 0 && !attachedFile) {
+      if (session) {
+        if (session.fileBase64 && !attachedFile) {
+          setAttachedFile({
+            base64: session.fileBase64,
+            name: session.fileName || 'uploaded_image.png',
+            size: Math.round((session.fileBase64.length * 3) / 4),
+            type: session.fileContentType || 'image/png',
+          });
+        }
+        if (session.missingInputs && session.missingInputs.length > 0 && !attachedFile && !session.fileBase64) {
+          setCurrentSession(session);
+          setSessionModalOpen(true);
+          return;
+        }
         setCurrentSession(session);
-        setSessionModalOpen(true);
-        return;
       }
     } catch (e) {
       console.debug('Could not pre-fetch session', e);
@@ -309,6 +326,14 @@ export const AiAssistant: React.FC = () => {
     fileContentType?: string;
   }) => {
     if (!selectedAppId) return;
+    if (data.fileBase64) {
+      setAttachedFile({
+        base64: data.fileBase64,
+        name: data.fileName || 'uploaded_image.png',
+        size: Math.round((data.fileBase64.length * 3) / 4),
+        type: data.fileContentType || 'image/png',
+      });
+    }
     try {
       const updated = await conversationsApi.provideSessionInput(selectedAppId, data);
       setCurrentSession(updated);
@@ -326,6 +351,7 @@ export const AiAssistant: React.FC = () => {
       }
     }
     setCurrentSession(null);
+    setAttachedFile(null);
     setSessionModalOpen(false);
   };
 
@@ -370,13 +396,13 @@ export const AiAssistant: React.FC = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Selected image exceeds the maximum allowed size of 10MB.');
+    // Validate size (max 20MB raw file before client-side optimization)
+    if (file.size > 20 * 1024 * 1024) {
+      alert('Selected file exceeds the maximum allowed size of 20MB.');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -390,18 +416,13 @@ export const AiAssistant: React.FC = () => {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const base64 = result.split(',')[1] || result;
-      setAttachedFile({
-        base64,
-        name: file.name,
-        size: file.size,
-        type: file.type || 'image/png',
-      });
-    };
-    reader.readAsDataURL(file);
+    try {
+      const processed = await processImageFile(file);
+      setAttachedFile(processed);
+    } catch (err) {
+      console.error('Failed to process image', err);
+      alert('Could not process the selected image.');
+    }
   };
 
   const renderStructuredReport = (metadataJson?: string | null) => {
@@ -816,6 +837,9 @@ export const AiAssistant: React.FC = () => {
                   style={{ padding: '0.15rem', color: '#ef4444' }}
                   onClick={() => {
                     setAttachedFile(null);
+                    if (currentSession?.fileBase64) {
+                      setCurrentSession((prev) => prev ? { ...prev, fileBase64: undefined, fileName: undefined, fileContentType: undefined } : null);
+                    }
                     if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
                 >

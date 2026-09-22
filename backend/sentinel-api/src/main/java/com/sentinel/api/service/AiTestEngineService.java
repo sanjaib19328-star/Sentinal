@@ -570,7 +570,17 @@ public class AiTestEngineService {
         report.setTotalDurationMs(duration);
         report.setAvgLatencyMs(results.isEmpty() ? 0 : (double) totalLatency / results.size());
         report.setStepResults(results);
-        report.setRememberedContext(runtimeVariables);
+        Map<String, String> sanitizedContext = new HashMap<>();
+        for (Map.Entry<String, String> entry : runtimeVariables.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().toLowerCase(Locale.ROOT).contains("base64") && entry.getValue() != null && entry.getValue().length() > 500) {
+                String fName = runtimeVariables.getOrDefault("file_name", "uploaded_file");
+                String fType = runtimeVariables.getOrDefault("file_content_type", "image/png");
+                sanitizedContext.put(entry.getKey(), "[BINARY DATA: " + fName + " (" + fType + ")]");
+            } else {
+                sanitizedContext.put(entry.getKey(), entry.getValue());
+            }
+        }
+        report.setRememberedContext(sanitizedContext);
 
         if (failedCount == 0 && blockedCount == 0 && pendingApprovalCount == 0) {
             report.setOverallStatus("PASSED");

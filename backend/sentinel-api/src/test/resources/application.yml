@@ -59,6 +59,9 @@ sentinel:
 
 server:
   port: 0
+  tomcat:
+    max-swallow-size: 50MB
+    max-http-form-post-size: 50MB
 
 management:
   endpoints:

@@ -11,6 +11,8 @@ import {
   RunAiTestRequest,
 } from '../types/conversation';
 
+export { buildSendMessagePayload } from './messagePayload';
+
 export const conversationsApi = {
   list: async (params?: { applicationId?: number; search?: string }): Promise<Conversation[]> => {
     const res = await apiClient.get<Conversation[]>('/api/v1/conversations', { params });
@@ -37,7 +39,9 @@ export const conversationsApi = {
   },
 
   sendMessage: async (id: number, data: SendMessageRequest): Promise<ConversationDetail> => {
-    const res = await apiClient.post<ConversationDetail>(`/api/v1/conversations/${id}/messages`, data);
+    const res = await apiClient.post<ConversationDetail>(`/api/v1/conversations/${id}/messages`, data, {
+      timeout: 60000,
+    });
     return res.data;
   },
 
@@ -47,7 +51,9 @@ export const conversationsApi = {
   },
 
   runAiTestForConversation: async (id: number, data: RunAiTestRequest): Promise<AiTestRunReport> => {
-    const res = await apiClient.post<AiTestRunReport>(`/api/v1/conversations/${id}/run-ai-test`, data);
+    const res = await apiClient.post<AiTestRunReport>(`/api/v1/conversations/${id}/run-ai-test`, data, {
+      timeout: 120000,
+    });
     return res.data;
   },
 
@@ -57,7 +63,9 @@ export const conversationsApi = {
   },
 
   runDirectAiTest: async (applicationId: number, data: RunAiTestRequest): Promise<AiTestRunReport> => {
-    const res = await apiClient.post<AiTestRunReport>(`/api/v1/applications/${applicationId}/run-ai-test`, data);
+    const res = await apiClient.post<AiTestRunReport>(`/api/v1/applications/${applicationId}/run-ai-test`, data, {
+      timeout: 120000,
+    });
     return res.data;
   },
 
@@ -67,7 +75,9 @@ export const conversationsApi = {
   },
 
   provideSessionInput: async (applicationId: number, data: { inputKey?: string; inputValue?: string; fileBase64?: string; fileName?: string; fileContentType?: string }): Promise<any> => {
-    const res = await apiClient.post<any>(`/api/v1/applications/${applicationId}/ai-test-session/input`, data);
+    const res = await apiClient.post<any>(`/api/v1/applications/${applicationId}/ai-test-session/input`, data, {
+      timeout: 45000,
+    });
     return res.data;
   },
 

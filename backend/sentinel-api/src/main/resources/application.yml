@@ -70,6 +70,9 @@ sentinel:
 server:
   port: ${PORT:8080}
   max-http-request-header-size: ${SERVER_MAX_HTTP_HEADER_SIZE:16384}
+  tomcat:
+    max-swallow-size: 50MB
+    max-http-form-post-size: 50MB
 
 management:
   endpoints:

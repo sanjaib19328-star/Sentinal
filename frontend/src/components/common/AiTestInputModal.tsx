@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { AiTestSession } from '../../types/conversation';
 import { ApiKey } from '../../types/apiKey';
+import { processImageFile } from '../../utils/imageCompressor';
 
 interface AiTestInputModalProps {
   isOpen: boolean;
@@ -65,30 +66,24 @@ export const AiTestInputModal: React.FC<AiTestInputModalProps> = ({
 
   if (!isOpen || !session) return null;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const result = reader.result as string;
-      const base64 = result.split(',')[1] || result;
-      const fileData = {
-        base64,
-        name: file.name,
-        size: file.size,
-        type: file.type || 'image/png',
-      };
+    try {
+      const fileData = await processImageFile(file);
       setSelectedFile(fileData);
       await onProvideInput({
         inputKey: 'file_base64',
-        inputValue: base64,
-        fileBase64: base64,
-        fileName: file.name,
-        fileContentType: file.type || 'image/png',
+        inputValue: fileData.base64,
+        fileBase64: fileData.base64,
+        fileName: fileData.name,
+        fileContentType: fileData.type,
       });
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Failed to process uploaded file', err);
+      alert('Could not process the selected image.');
+    }
   };
 
   const handleApiKeySubmit = async () => {
@@ -443,7 +438,15 @@ export const AiTestInputModal: React.FC<AiTestInputModalProps> = ({
               type="button"
               className="btn btn-primary btn-sm"
               disabled={loading}
-              onClick={() => onContinueTest(approveDestructive, selectedFile)}
+              onClick={() => {
+                const effectiveFile = selectedFile || (session?.fileBase64 ? {
+                  base64: session.fileBase64,
+                  name: session.fileName || 'uploaded_image.png',
+                  size: Math.round((session.fileBase64.length * 3) / 4),
+                  type: session.fileContentType || 'image/png',
+                } : null);
+                onContinueTest(approveDestructive, effectiveFile);
+              }}
               style={{ gap: '0.375rem' }}
             >
               <Play style={{ width: '0.875rem', height: '0.875rem' }} />
